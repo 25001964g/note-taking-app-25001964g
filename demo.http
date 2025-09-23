@@ -1,0 +1,7 @@
+Post http://localhost:5001/api/note
+Content-Type: application/json
+
+{
+  "title": "Meeting Notes",
+  "content": "Discuss project milestones and deadlines."
+}

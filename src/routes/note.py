@@ -16,8 +16,20 @@ def create_note():
         data = request.json
         if not data or 'title' not in data or 'content' not in data:
             return jsonify({'error': 'Title and content are required'}), 400
-        
-        note = Note(title=data['title'], content=data['content'])
+        # accept optional fields: tags (list or comma string), event_date (YYYY-MM-DD), event_time (HH:MM:SS)
+        tags = data.get('tags')
+        if isinstance(tags, list):
+            tags_str = ','.join([t.strip() for t in tags if t is not None])
+        else:
+            tags_str = tags.strip() if isinstance(tags, str) and tags.strip() != '' else None
+
+        note = Note(
+            title=data['title'],
+            content=data['content'],
+            tags=tags_str,
+            event_date=data.get('event_date'),
+            event_time=data.get('event_time')
+        )
         db.session.add(note)
         db.session.commit()
         return jsonify(note.to_dict()), 201
@@ -43,6 +55,19 @@ def update_note(note_id):
         
         note.title = data.get('title', note.title)
         note.content = data.get('content', note.content)
+        # Update optional fields
+        if 'tags' in data:
+            tags = data.get('tags')
+            if isinstance(tags, list):
+                note.tags = ','.join([t.strip() for t in tags if t is not None])
+            else:
+                note.tags = tags.strip() if isinstance(tags, str) and tags.strip() != '' else None
+
+        if 'event_date' in data:
+            note.event_date = data.get('event_date')
+
+        if 'event_time' in data:
+            note.event_time = data.get('event_time')
         db.session.commit()
         return jsonify(note.to_dict())
     except Exception as e:

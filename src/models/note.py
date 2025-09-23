@@ -6,6 +6,10 @@ class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
+    # 新增欄位: 以逗號分隔的 tags 字串, event date/time
+    tags = db.Column(db.String(200), nullable=True)
+    event_date = db.Column(db.Date, nullable=True)
+    event_time = db.Column(db.Time, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -17,6 +21,10 @@ class Note(db.Model):
             'id': self.id,
             'title': self.title,
             'content': self.content,
+            # 回傳 tags 作為 list（前端處理更方便）
+            'tags': [t.strip() for t in self.tags.split(',')] if self.tags else [],
+            'event_date': self.event_date.isoformat() if self.event_date else None,
+            'event_time': self.event_time.isoformat() if self.event_time else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
