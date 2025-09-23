@@ -105,6 +105,206 @@
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
+        .ai-generate-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .ai-generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        /* AI Generate Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .language-select {
+            margin-bottom: 20px;
+        }
+
+        .language-select label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .language-select select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .prompt-input {
+            margin-bottom: 20px;
+        }
+
+        .prompt-input label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .prompt-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .prompt-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-generate {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-generate:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-generate:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-cancel {
+            background: #f8f9fa;
+            color: #333;
+            border: 2px solid #e1e5e9;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-cancel:hover {
+            background: #e9ecef;
+            border-color: #ced4da;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .notes-list {
             max-height: 500px;
             overflow-y: auto;
@@ -198,6 +398,49 @@
         .btn-delete:hover {
             background: #c82333;
             transform: translateY(-1px);
+        }
+
+        .btn-translate {
+            background: #6f42c1;
+            color: white;
+            position: relative;
+        }
+
+        .btn-translate:hover {
+            background: #5a2d91;
+            transform: translateY(-1px);
+        }
+
+        .translate-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 180px;
+            display: none;
+        }
+
+        .translate-dropdown.show {
+            display: block;
+        }
+
+        .translate-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f1f1;
+            transition: background 0.2s ease;
+        }
+
+        .translate-option:hover {
+            background: #f8f9fa;
+        }
+
+        .translate-option:last-child {
+            border-bottom: none;
         }
 
         .form-group {
@@ -334,6 +577,7 @@
             <div class="sidebar">
                 <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search notes...">
                 <button class="new-note-btn" id="newNoteBtn">✨ New Note</button>
+                <button class="ai-generate-btn" id="aiGenerateBtn">🤖 AI Generate Note</button>
                 
                 <div class="notes-list" id="notesList">
                     <div class="loading">Loading notes...</div>
@@ -345,6 +589,21 @@
                     <h2 class="editor-title" id="editorTitle">Select a note to edit</h2>
                     <div class="editor-actions" id="editorActions" style="display: none;">
                         <button class="btn btn-save" id="saveBtn">💾 Save</button>
+                        <div style="position: relative;">
+                            <button class="btn btn-translate" id="translateBtn">🌐 Translate ▼</button>
+                            <div class="translate-dropdown" id="translateDropdown">
+                                <div class="translate-option" data-lang="Spanish">🇪🇸 Spanish</div>
+                                <div class="translate-option" data-lang="French">🇫🇷 French</div>
+                                <div class="translate-option" data-lang="German">🇩🇪 German</div>
+                                <div class="translate-option" data-lang="Italian">🇮🇹 Italian</div>
+                                <div class="translate-option" data-lang="Portuguese">🇵🇹 Portuguese</div>
+                                <div class="translate-option" data-lang="Japanese">🇯🇵 Japanese</div>
+                                <div class="translate-option" data-lang="Korean">🇰🇷 Korean</div>
+                                <div class="translate-option" data-lang="Chinese">🇨🇳 Chinese</div>
+                                <div class="translate-option" data-lang="Russian">🇷🇺 Russian</div>
+                                <div class="translate-option" data-lang="Arabic">🇸🇦 Arabic</div>
+                            </div>
+                        </div>
                         <button class="btn btn-delete" id="deleteBtn">🗑️ Delete</button>
                     </div>
                 </div>
@@ -387,6 +646,57 @@
         </div>
     </div>
 
+    <!-- AI Generate Note Modal -->
+    <div id="aiGenerateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">🤖 AI Generate Note</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            
+            <div class="language-select">
+                <label for="outputLanguage">Output Language:</label>
+                <select id="outputLanguage">
+                    <option value="English">🇺🇸 English</option>
+                    <option value="Chinese">🇨🇳 Chinese (中文)</option>
+                    <option value="Japanese">🇯🇵 Japanese (日本語)</option>
+                    <option value="Spanish">🇪🇸 Spanish (Español)</option>
+                    <option value="French">🇫🇷 French (Français)</option>
+                    <option value="German">🇩🇪 German (Deutsch)</option>
+                    <option value="Korean">🇰🇷 Korean (한국어)</option>
+                    <option value="Italian">🇮🇹 Italian (Italiano)</option>
+                    <option value="Portuguese">🇵🇹 Portuguese (Português)</option>
+                    <option value="Russian">🇷🇺 Russian (Русский)</option>
+                </select>
+            </div>
+            
+            <div class="prompt-input">
+                <label for="userPrompt">Enter your prompt:</label>
+                <textarea 
+                    id="userPrompt" 
+                    class="prompt-textarea" 
+                    placeholder="Describe what you want to note down... 
+
+Examples:
+• Meeting with John at 3pm on Friday to discuss project updates
+• 明天下午3點和John開會討論專案進度
+• Shopping list: milk, bread, eggs, vegetables
+• Badminton practice tomorrow 5pm at PolyU sports center
+• 買い物リスト: 牛乳、パン、卵、野菜を買う必要がある"></textarea>
+            </div>
+            
+            <div class="loading-spinner" id="loadingSpinner">
+                <div class="spinner"></div>
+                <p>AI is generating your note...</p>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" id="cancelGenerate">Cancel</button>
+                <button class="btn-generate" id="generateNote">✨ Generate Note</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         class NoteTaker {
             constructor() {
@@ -406,6 +716,39 @@
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
+                
+                // AI Generate Note events
+                document.getElementById('aiGenerateBtn').addEventListener('click', () => this.openAIGenerateModal());
+                document.getElementById('closeModal').addEventListener('click', () => this.closeAIGenerateModal());
+                document.getElementById('cancelGenerate').addEventListener('click', () => this.closeAIGenerateModal());
+                document.getElementById('generateNote').addEventListener('click', () => this.generateAINote());
+                
+                // Close modal when clicking outside
+                document.getElementById('aiGenerateModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'aiGenerateModal') {
+                        this.closeAIGenerateModal();
+                    }
+                });
+                
+                // Translate dropdown events
+                document.getElementById('translateBtn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleTranslateDropdown();
+                });
+                
+                // Close dropdown when clicking outside
+                document.addEventListener('click', () => {
+                    this.closeTranslateDropdown();
+                });
+                
+                // Translate option clicks
+                document.querySelectorAll('.translate-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        const language = e.target.getAttribute('data-lang');
+                        this.translateNote(language);
+                        this.closeTranslateDropdown();
+                    });
+                });
                 
                 // Auto-save on content change (debounced)
                 let saveTimeout;
@@ -494,6 +837,83 @@
                 document.querySelectorAll('.note-item').forEach(item => {
                     item.classList.remove('active');
                 });
+            }
+
+            // AI Generate Note Methods
+            openAIGenerateModal() {
+                document.getElementById('aiGenerateModal').style.display = 'block';
+                document.getElementById('userPrompt').focus();
+                // Reset form
+                document.getElementById('userPrompt').value = '';
+                document.getElementById('outputLanguage').value = 'English';
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('generateNote').disabled = false;
+            }
+
+            closeAIGenerateModal() {
+                document.getElementById('aiGenerateModal').style.display = 'none';
+            }
+
+            async generateAINote() {
+                const prompt = document.getElementById('userPrompt').value.trim();
+                const language = document.getElementById('outputLanguage').value;
+                
+                if (!prompt) {
+                    this.showMessage('Please enter a prompt to generate a note.', 'error');
+                    return;
+                }
+
+                // Show loading state
+                document.getElementById('loadingSpinner').style.display = 'block';
+                document.getElementById('generateNote').disabled = true;
+
+                try {
+                    const response = await fetch('/api/notes/generate-and-save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            text: prompt,
+                            language: language
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    // Hide loading state
+                    document.getElementById('loadingSpinner').style.display = 'none';
+                    document.getElementById('generateNote').disabled = false;
+                    
+                    // Close modal
+                    this.closeAIGenerateModal();
+                    
+                    // Show success message
+                    this.showMessage(`✨ AI note generated successfully! "${result.note.title}"`, 'success');
+                    
+                    // Reload notes to show the new one
+                    await this.loadNotes();
+                    
+                    // Auto-select the newly created note
+                    if (result.note.id) {
+                        setTimeout(() => {
+                            this.selectNote(result.note.id);
+                        }, 500);
+                    }
+
+                } catch (error) {
+                    console.error('Error generating AI note:', error);
+                    
+                    // Hide loading state
+                    document.getElementById('loadingSpinner').style.display = 'none';
+                    document.getElementById('generateNote').disabled = false;
+                    
+                    this.showMessage('Failed to generate AI note. Please try again.', 'error');
+                }
             }
 
             showEditor() {
@@ -595,6 +1015,71 @@
                     this.showMessage('Note deleted successfully!', 'success');
                 } catch (error) {
                     this.showMessage(`Error deleting note: ${error.message}`, 'error');
+                }
+            }
+
+            toggleTranslateDropdown() {
+                const dropdown = document.getElementById('translateDropdown');
+                dropdown.classList.toggle('show');
+            }
+
+            closeTranslateDropdown() {
+                const dropdown = document.getElementById('translateDropdown');
+                dropdown.classList.remove('show');
+            }
+
+            async translateNote(targetLanguage) {
+                if (!this.currentNote || !this.currentNote.id) {
+                    this.showMessage('Please select a note first', 'error');
+                    return;
+                }
+
+                const title = document.getElementById('noteTitle').value.trim();
+                const content = document.getElementById('noteContent').value.trim();
+                
+                if (!title && !content) {
+                    this.showMessage('Note title and content are both empty', 'error');
+                    return;
+                }
+
+                try {
+                    this.showMessage(`Translating to ${targetLanguage}...`, 'loading');
+                    
+                    const response = await fetch(`/api/notes/${this.currentNote.id}/translate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            target_language: targetLanguage,
+                            title: title,
+                            content: content
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to translate note');
+
+                    const result = await response.json();
+                    
+                    if (result.translated_title !== undefined || result.translated_content !== undefined) {
+                        // Replace the title and content directly in the form fields
+                        if (result.translated_title && title) {
+                            document.getElementById('noteTitle').value = result.translated_title;
+                        }
+                        
+                        if (result.translated_content && content) {
+                            document.getElementById('noteContent').value = result.translated_content;
+                        }
+                        
+                        // Update the editor title if title was translated
+                        if (result.translated_title && title) {
+                            document.getElementById('editorTitle').textContent = result.translated_title;
+                        }
+                        
+                        this.showMessage(`Successfully translated to ${targetLanguage}!`, 'success');
+                    } else {
+                        throw new Error(result.error || 'Translation failed');
+                    }
+                } catch (error) {
+                    this.showMessage(`Error translating note: ${error.message}`, 'error');
                 }
             }
 

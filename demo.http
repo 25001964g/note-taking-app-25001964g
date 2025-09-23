@@ -1,7 +1,39 @@
-Post http://localhost:5001/api/note
+Post http://localhost:5002/api/notes
 Content-Type: application/json
 
 {
   "title": "Meeting Notes",
   "content": "Discuss project milestones and deadlines."
+}
+### Generate a structured note from user input (English)
+POST http://localhost:5002/api/notes/generate
+Content-Type: application/json
+
+{
+  "text": "Meeting with John at 3pm on Friday to discuss the project updates",
+  "language": "English"
+}
+### Generate a structured note from user input (Chinese)
+POST http://localhost:5002/api/notes/generate
+Content-Type: application/json
+
+{
+  "text": "明天下午3點和John開會討論專案進度",
+  "language": "Chinese"
+}
+### Generate and save a structured note to database
+POST http://localhost:5002/api/notes/generate-and-save
+Content-Type: application/json
+
+{
+  "text": "Badminton practice tomorrow 5pm at PolyU sports center. Don't forget to bring racket and shoes.",
+  "language": "English"
+}
+### Generate a structured note in Japanese
+POST http://localhost:5002/api/notes/generate
+Content-Type: application/json
+
+{
+  "text": "買い物リスト: 牛乳、パン、卵、野菜を買う必要がある",
+  "language": "Japanese"
 }
