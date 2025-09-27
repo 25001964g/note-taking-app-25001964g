@@ -42,7 +42,27 @@ def extract_notes(text, lang="English"):
         {"role": "user", "content": text}
     ]
     response = call_llm_model(model, messages)
-    return response
+    
+    # Try to parse JSON response
+    try:
+        import json
+        parsed_response = json.loads(response)
+        
+        # Convert to expected format
+        result = {
+            'title': parsed_response.get('Title', ''),
+            'content': parsed_response.get('Notes', ''),
+            'tags': parsed_response.get('Tags', [])
+        }
+        return result
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"⚠️ Could not parse LLM response as JSON: {e}")
+        # Return raw response as fallback
+        return {
+            'title': 'AI Generated Note',
+            'content': response,
+            'tags': ['ai', 'generated']
+        }
 
 
 #main function
