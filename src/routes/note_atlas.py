@@ -63,13 +63,17 @@ def create_note():
             processed_tags = []
 
         # Create note in MongoDB Atlas
-        note = mongo_note_model.create_note(
-            title=data['title'],
-            content=data['content'],
-            tags=processed_tags,
-            event_date=data.get('event_date'),
-            event_time=data.get('event_time')
-        )
+        note_data = {
+            'title': data['title'],
+            'content': data['content'],
+            'tags': processed_tags,
+            'event_date': data.get('event_date'),
+            'event_time': data.get('event_time')
+        }
+        note_id = mongo_note_model.create_note(note_data)
+        
+        # Get the created note to return it
+        note = mongo_note_model.get_note(note_id)
         
         return jsonify(note), 201
     except Exception as e:
@@ -254,37 +258,35 @@ def generate_and_save_note():
         print(f"🤖 Generating and saving note from: '{text}' in {language}")
         
         # Extract structured notes using LLM
-        llm_response = extract_notes(text, lang=language)
+        structured_note = extract_notes(text, lang=language)
         
-        # Parse the JSON response from LLM
-        try:
-            structured_note = json.loads(llm_response)
-        except json.JSONDecodeError:
-            # If JSON parsing fails, try to extract JSON from the response
-            import re
-            json_match = re.search(r'\{.*\}', llm_response, re.DOTALL)
-            if json_match:
-                structured_note = json.loads(json_match.group())
-            else:
-                return jsonify({'error': 'Failed to parse LLM response'}), 500
+        # Validate the response from LLM
+        if not structured_note or not isinstance(structured_note, dict):
+            return jsonify({'error': 'Failed to generate structured note'}), 500
         
         # Validate required fields
-        if 'Title' not in structured_note or 'Notes' not in structured_note:
+        if 'title' not in structured_note or 'content' not in structured_note:
             return jsonify({'error': 'LLM response missing required fields'}), 500
         
         # Prepare tags
-        tags = structured_note.get('Tags', [])
+        tags = structured_note.get('tags', [])
         if not isinstance(tags, list):
             tags = []
         
+        # Create note data for MongoDB Atlas
+        note_data = {
+            'title': structured_note.get('title', ''),
+            'content': structured_note.get('content', ''),
+            'tags': tags,
+            'event_date': data.get('event_date'),
+            'event_time': data.get('event_time')
+        }
+        
         # Create and save the note to MongoDB Atlas
-        note = mongo_note_model.create_note(
-            title=structured_note.get('Title', ''),
-            content=structured_note.get('Notes', ''),
-            tags=tags,
-            event_date=data.get('event_date'),
-            event_time=data.get('event_time')
-        )
+        note_id = mongo_note_model.create_note(note_data)
+        
+        # Get the created note to return it
+        note = mongo_note_model.get_note(note_id)
         
         print(f"✅ Generated note saved to MongoDB Atlas: {note['title']}")
         

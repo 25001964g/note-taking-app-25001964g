@@ -10,7 +10,9 @@ import time
 from datetime import datetime
 
 # Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0        print("\n🚀 Ready to start your application:")
+        print("   ./start_dev_server.sh")
+        print("\n🌐 Then visit: http://127.0.0.1:5002")       print("🌐 Then visit: http://127.0.0.1:5002")s.path.dirname(os.path.dirname(__file__)))
 
 def test_mongodb_atlas_integration():
     """Test MongoDB Atlas connection and basic operations"""

@@ -11,7 +11,7 @@ with open('token.txt', 'r') as f:
     token = f.read().strip()
 os.environ['GITHUB_TOKEN'] = token
 
-BASE_URL = 'http://127.0.0.1:5002'
+BASE_URL = 'http://127.0.0.1:5005'
 
 def test_generate_note():
     """Test the /api/notes/generate endpoint"""
