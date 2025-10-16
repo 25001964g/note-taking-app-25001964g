@@ -44,7 +44,16 @@ async def get_notes():
 async def create_note():
     try:
         data = request.json
-        note = await Note.create(title=data['title'], content=data['content'])
+        # Handle tags: convert list to comma-separated string if present
+        tags = data.get('tags', [])
+        if isinstance(tags, list):
+            tags = ','.join(tags)
+        
+        note = await Note.create(
+            title=data['title'], 
+            content=data['content'],
+            tags=tags
+        )
         result = note.to_dict()
         print(f"Created note: {result}")  # Debug logging
         return jsonify(result), 201
@@ -70,7 +79,16 @@ async def update_note(note_id):
         return jsonify({"error": "Note not found"}), 404
     
     data = request.json
-    updated_note = await note.update(title=data.get('title'), content=data.get('content'))
+    # Handle tags: convert list to comma-separated string if present
+    tags = data.get('tags', [])
+    if isinstance(tags, list):
+        tags = ','.join(tags)
+    
+    updated_note = await note.update(
+        title=data.get('title'),
+        content=data.get('content'),
+        tags=tags
+    )
     return jsonify(updated_note.to_dict())
 
 @app.route('/api/notes/<note_id>', methods=['DELETE'])
@@ -103,9 +121,15 @@ async def generate_and_save_note():
         print(f"LLM response: {structured_note}")
         
         # Create and save the note
+        # Get tags from LLM response and convert to string
+        tags = structured_note.get('tags', [])
+        if isinstance(tags, list):
+            tags = ','.join(tags)
+
         note = await Note.create(
             title=structured_note.get('title', 'AI Generated Note'),
-            content=structured_note.get('content', text)
+            content=structured_note.get('content', text),
+            tags=tags
         )
         
         result = {

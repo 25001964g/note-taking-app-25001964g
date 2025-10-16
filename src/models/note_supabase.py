@@ -7,15 +7,17 @@ class Note(BaseModel):
     id: Optional[str] = None
     title: str
     content: str
+    tags: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     @classmethod
-    async def create(cls, title: str, content: str) -> 'Note':
+    async def create(cls, title: str, content: str, tags: Optional[str] = None) -> 'Note':
         try:
             data = {
                 'title': title,
                 'content': content,
+                'tags': tags,
                 'created_at': datetime.utcnow().isoformat(),
                 'updated_at': datetime.utcnow().isoformat()
             }
@@ -66,13 +68,15 @@ class Note(BaseModel):
             print(f"Error getting note by ID: {e}")
             raise
 
-    async def update(self, title: str = None, content: str = None) -> 'Note':
+    async def update(self, title: str = None, content: str = None, tags: str = None) -> 'Note':
         try:
             update_data: Dict[str, Any] = {'updated_at': datetime.utcnow().isoformat()}
             if title is not None:
                 update_data['title'] = title
             if content is not None:
                 update_data['content'] = content
+            if tags is not None:
+                update_data['tags'] = tags
 
             result = supabase.table('notes').update(update_data).eq('id', self.id).execute()
             updated_data = result.data[0]
@@ -96,6 +100,7 @@ class Note(BaseModel):
             'id': str(self.id) if self.id is not None else None,  # Ensure ID is a string
             'title': str(self.title) if self.title is not None else '',
             'content': str(self.content) if self.content is not None else '',
+            'tags': str(self.tags) if self.tags is not None else '',
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
