@@ -3,49 +3,60 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, send_from_directory
-from flask_cors import CORS
-from src.models.user import db
-from src.routes.user import user_bp
-from src.routes.note import note_bp
-from src.models.note import Note
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from src.routes import note_supabase
+from src.db_config import supabase
+from dotenv import load_dotenv
 
-app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
-app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
+# Load environment variables
+load_dotenv()
 
-# Enable CORS for all routes
-CORS(app)
+app = FastAPI(title="NoteTaker")
 
-# register blueprints
-app.register_blueprint(user_bp, url_prefix='/api')
-app.register_blueprint(note_bp, url_prefix='/api')
-# configure database to use repository-root `database/app.db`
-ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-DB_PATH = os.path.join(ROOT_DIR, 'database', 'app.db')
-# ensure database directory exists
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+# CORS middleware configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_PATH}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-with app.app_context():
-    db.create_all()
+# Include routers
+app.include_router(note_supabase.router, prefix="/api")
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    static_folder_path = app.static_folder
-    if static_folder_path is None:
-            return "Static folder not configured", 404
+# Create static directory if it doesn't exist
+static_folder = os.path.join(os.path.dirname(__file__), 'static')
+os.makedirs(static_folder, exist_ok=True)
 
-    if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
-        return send_from_directory(static_folder_path, path)
+# Mount static files
+app.mount("/static", StaticFiles(directory=static_folder), name="static")
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve the Single Page Application"""
+    static_folder = os.path.join(os.path.dirname(__file__), 'static')
+    file_path = os.path.join(static_folder, full_path)
+    
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
     else:
-        index_path = os.path.join(static_folder_path, 'index.html')
+        index_path = os.path.join(static_folder, 'index.html')
         if os.path.exists(index_path):
-            return send_from_directory(static_folder_path, 'index.html')
-        else:
-            return "index.html not found", 404
+            return FileResponse(index_path)
+        raise HTTPException(status_code=404, detail="File not found")
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "database": "connected"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
 
 
 if __name__ == '__main__':
