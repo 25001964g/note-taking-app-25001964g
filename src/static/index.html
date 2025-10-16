@@ -793,7 +793,7 @@ Examples:
 
                 notesList.innerHTML = this.notes.map(note => `
                     <div class="note-item ${this.currentNote && this.currentNote.id === note.id ? 'active' : ''}" 
-                         data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
+                         data-note-id="${note.id}" onclick="noteTaker.selectNote('${note.id}')">
                         <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                         <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
                         <div class="note-date">${this.formatDate(note.updated_at)}</div>
@@ -802,20 +802,36 @@ Examples:
             }
 
             async selectNote(noteId) {
-                const note = this.notes.find(n => n.id === noteId);
-                if (!note) return;
+                try {
+                    // First try to find the note in our existing list
+                    const note = this.notes.find(n => n.id === noteId);
+                    
+                    if (!note) {
+                        // If not found in list, try to fetch it directly
+                        const response = await fetch(`/api/notes/${noteId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to load note');
+                        }
+                        this.currentNote = await response.json();
+                    } else {
+                        this.currentNote = note;
+                    }
 
-                this.currentNote = note;
-                this.showEditor();
-                this.renderNotesList(); // Re-render to update active state
-                
-                document.getElementById('noteTitle').value = note.title || '';
-                document.getElementById('noteContent').value = note.content || '';
-                // populate new fields
-                document.getElementById('noteTags').value = (note.tags && Array.isArray(note.tags)) ? note.tags.join(', ') : (note.tags || '');
-                document.getElementById('noteEventDate').value = note.event_date || '';
-                document.getElementById('noteEventTime').value = note.event_time || '';
-                document.getElementById('editorTitle').textContent = note.title || 'Untitled Note';
+                    this.showEditor();
+                    this.renderNotesList(); // Re-render to update active state
+                    
+                    // Update form fields
+                    document.getElementById('noteTitle').value = this.currentNote.title || '';
+                    document.getElementById('noteContent').value = this.currentNote.content || '';
+                    // populate new fields
+                    document.getElementById('noteTags').value = (this.currentNote.tags && Array.isArray(this.currentNote.tags)) ? this.currentNote.tags.join(', ') : (this.currentNote.tags || '');
+                    document.getElementById('noteEventDate').value = this.currentNote.event_date || '';
+                    document.getElementById('noteEventTime').value = this.currentNote.event_time || '';
+                    document.getElementById('editorTitle').textContent = this.currentNote.title || 'Untitled Note';
+                } catch (error) {
+                    console.error('Error selecting note:', error);
+                    this.showMessage('Failed to load note. Please try again.', 'error');
+                }
             }
 
             createNewNote() {

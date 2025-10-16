@@ -1,0 +1,147 @@
+import os
+import sys
+from dotenv import load_dotenv
+
+# DON'T CHANGE THIS !!!
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from flask import Flask, send_from_directory, jsonify, request
+from flask_cors import CORS
+from src.db_config import supabase
+from src.models.note_supabase import Note
+
+# Load environment variables
+load_dotenv()
+
+app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
+
+# Enable CORS for all routes
+CORS(app)
+
+@app.route('/api/notes/generate-and-save', methods=['POST'])
+async def generate_and_save_note():
+    try:
+        from src.llm import extract_notes
+        
+        data = request.json
+        text = data.get('text')
+        lang = data.get('lang', 'English')
+        
+        if not text:
+            return jsonify({"error": "Text is required"}), 400
+            
+        # Generate note using LLM
+        generated_note = extract_notes(text, lang)
+        
+        if not generated_note:
+            return jsonify({"error": "Failed to generate note"}), 500
+            
+        # Save the generated note
+        note = await Note.create(
+            title=generated_note.get('Title', 'Untitled'),
+            content=generated_note.get('Notes', text)
+        )
+        
+        # Add tags to the response
+        response = note.to_dict()
+        response['tags'] = generated_note.get('Tags', [])
+        
+        return jsonify(response), 201
+        
+    except Exception as e:
+        app.logger.error(f"Error generating note: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/notes', methods=['GET'])
+async def get_notes():
+    notes = await Note.get_all()
+    return jsonify([note.to_dict() for note in notes])
+
+@app.route('/api/notes', methods=['POST'])
+async def create_note():
+    data = request.json
+    note = await Note.create(title=data['title'], content=data['content'])
+    return jsonify(note.to_dict()), 201
+
+@app.route('/api/notes/<note_id>', methods=['GET'])
+async def get_note(note_id):
+    note = await Note.get_by_id(note_id)
+    if note is None:
+        return jsonify({"error": "Note not found"}), 404
+    return jsonify(note.to_dict())
+
+@app.route('/api/notes/<note_id>', methods=['PUT'])
+async def update_note(note_id):
+    note = await Note.get_by_id(note_id)
+    if note is None:
+        return jsonify({"error": "Note not found"}), 404
+    
+    data = request.json
+    updated_note = await note.update(title=data.get('title'), content=data.get('content'))
+    return jsonify(updated_note.to_dict())
+
+@app.route('/api/notes/<note_id>', methods=['DELETE'])
+async def delete_note(note_id):
+    note = await Note.get_by_id(note_id)
+    if note is None:
+        return jsonify({"error": "Note not found"}), 404
+    
+    await note.delete()
+    return jsonify({"message": "Note deleted successfully"})
+
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    static_folder_path = app.static_folder
+    if static_folder_path is None:
+        return "Static folder not configured", 404
+
+    # First try to serve the exact path
+    file_path = os.path.join(static_folder_path, path)
+    if path and os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(static_folder_path, path)
+    
+    # If not found or no path specified, serve index.html
+    index_path = os.path.join(static_folder_path, 'index.html')
+    if os.path.exists(index_path) and os.path.isfile(index_path):
+        return send_from_directory(static_folder_path, 'index.html')
+    
+    return "Not found", 404
+
+if __name__ == '__main__':
+    # Create static directory if it doesn't exist
+    if not os.path.exists(app.static_folder):
+        os.makedirs(app.static_folder)
+        
+    # Create index.html if it doesn't exist
+    index_path = os.path.join(app.static_folder, 'index.html')
+    if not os.path.exists(index_path):
+        with open(index_path, 'w') as f:
+            f.write("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteTaker</title>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>""")
+    if static_folder_path is None:
+        return "Static folder not configured", 404
+
+    if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
+        return send_from_directory(static_folder_path, path)
+    else:
+        index_path = os.path.join(static_folder_path, 'index.html')
+        if os.path.exists(index_path):
+            return send_from_directory(static_folder_path, 'index.html')
+        else:
+            return "index.html not found", 404
+
+if __name__ == '__main__':
+    port = int(os.getenv("PORT", 5002))
+    app.run(host='0.0.0.0', port=port, debug=True)
