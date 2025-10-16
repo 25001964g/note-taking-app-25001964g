@@ -82,6 +82,60 @@ async def delete_note(note_id):
     await note.delete()
     return jsonify({"message": "Note deleted successfully"})
 
+@app.route('/api/notes/<note_id>/translate', methods=['POST'])
+async def translate_note(note_id):
+    """Translate a note to the target language"""
+    try:
+        print(f"Starting translation for note {note_id}")
+        from src.llm import translate
+        
+        note = await Note.get_by_id(note_id)
+        if note is None:
+            print(f"Note {note_id} not found")
+            return jsonify({"error": "Note not found"}), 404
+
+        data = request.json
+        print(f"Received translation request data: {data}")
+        
+        if not data or 'target_language' not in data:
+            print("Missing target_language in request")
+            return jsonify({"error": "target_language is required"}), 400
+
+        target_language = data['target_language']
+        print(f"Translating to {target_language}")
+
+        # Get current title and content
+        title = note.title or ''
+        content = note.content or ''
+        print(f"Original title: {title}")
+        print(f"Original content: {content}")
+
+        # Translate both title and content
+        try:
+            translated_title = translate(title, target_language) if title.strip() else ''
+            print(f"Translated title: {translated_title}")
+            
+            translated_content = translate(content, target_language) if content.strip() else ''
+            print(f"Translated content: {translated_content}")
+
+            response = {
+                'translated_title': translated_title,
+                'translated_content': translated_content,
+                'original_title': title,
+                'original_content': content,
+                'target_language': target_language
+            }
+            print(f"Sending response: {response}")
+            return jsonify(response)
+            
+        except Exception as e:
+            print(f"Translation failed: {str(e)}")
+            raise
+
+    except Exception as e:
+        print(f"Translation error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
