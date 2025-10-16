@@ -3,7 +3,6 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from src.db_config import supabase
 
-#test
 class Note(BaseModel):
     id: Optional[str] = None
     title: str
