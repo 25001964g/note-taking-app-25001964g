@@ -82,6 +82,44 @@ async def delete_note(note_id):
     await note.delete()
     return jsonify({"message": "Note deleted successfully"})
 
+@app.route('/api/notes/generate-and-save', methods=['POST'])
+async def generate_and_save_note():
+    """Generate a structured note from user input using LLM and save it"""
+    try:
+        print("Starting AI note generation")
+        from src.llm import extract_notes
+        
+        data = request.json
+        if not data or 'text' not in data:
+            return jsonify({'error': 'text is required'}), 400
+            
+        text = data['text']
+        language = data.get('language', 'English')
+        
+        print(f"Generating note for text: {text} in {language}")
+        
+        # Extract structured notes using LLM
+        structured_note = extract_notes(text, lang=language)
+        print(f"LLM response: {structured_note}")
+        
+        # Create and save the note
+        note = await Note.create(
+            title=structured_note.get('title', 'AI Generated Note'),
+            content=structured_note.get('content', text)
+        )
+        
+        result = {
+            'note': note.to_dict(),
+            'original_text': text,
+            'language': language
+        }
+        print(f"Generated note: {result}")
+        return jsonify(result), 201
+        
+    except Exception as e:
+        print(f"Error generating AI note: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/notes/<note_id>/translate', methods=['POST'])
 async def translate_note(note_id):
     """Translate a note to the target language"""
