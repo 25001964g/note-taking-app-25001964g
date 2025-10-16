@@ -43,23 +43,56 @@ async def get_notes():
 @app.route('/api/notes', methods=['POST'])
 async def create_note():
     try:
+        print("Received create note request")
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
+            
         data = request.json
-        # Handle tags: convert list to comma-separated string if present
+        print(f"Received note data: {data}")
+        
+        # Validate required fields
+        if not data.get('title'):
+            return jsonify({"error": "Title is required"}), 400
+        if not data.get('content'):
+            return jsonify({"error": "Content is required"}), 400
+        
+        # Handle tags if present
         tags = data.get('tags', [])
         if isinstance(tags, list):
-            tags = ','.join(tags)
+            tags = ','.join(str(tag).strip() for tag in tags if tag)
         
-        note = await Note.create(
-            title=data['title'], 
-            content=data['content'],
-            tags=tags
-        )
-        result = note.to_dict()
-        print(f"Created note: {result}")  # Debug logging
-        return jsonify(result), 201
+        try:
+            print(f"Creating note with title: {data['title']}")
+            note = await Note.create(
+                title=data['title'],
+                content=data['content'],
+                tags=tags if tags else None,
+                event_date=data.get('event_date'),
+                event_time=data.get('event_time')
+            )
+            
+            result = note.to_dict()
+            print(f"Successfully created note: {result}")
+            return jsonify(result), 201
+            
+        except ValueError as ve:
+            error_msg = str(ve)
+            print(f"Validation error: {error_msg}")
+            return jsonify({"error": error_msg}), 400
+            
+        except Exception as e:
+            error_msg = f"Database error: {str(e)}"
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": "Failed to save note to database"}), 500
+            
     except Exception as e:
-        print(f"Error in create_note: {str(e)}")
-        return jsonify({"error": "Failed to create note"}), 500
+        error_msg = f"Request processing error: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Failed to process note creation request"}), 500
 
 @app.route('/api/notes/<note_id>', methods=['GET'])
 async def get_note(note_id):
@@ -106,6 +139,8 @@ async def generate_and_save_note():
     try:
         print("Starting AI note generation")
         from src.llm import extract_notes
+        from datetime import datetime, timedelta
+        import re
         
         data = request.json
         if not data or 'text' not in data:
@@ -120,25 +155,61 @@ async def generate_and_save_note():
         structured_note = extract_notes(text, lang=language)
         print(f"LLM response: {structured_note}")
         
-        # Create and save the note
+        # Get content for parsing date/time
+        content = structured_note.get('content', text)
+        event_date = None
+        event_time = None
+        
+        # Look for time patterns like "Xpm", "X:YY pm", "X:YY"
+        time_pattern = r'(\d{1,2})(?::(\d{2}))?\s*(?:am|pm|AM|PM)?'
+        time_matches = re.findall(time_pattern, content.lower())
+        if time_matches:
+            hour = int(time_matches[0][0])
+            minute = int(time_matches[0][1]) if time_matches[0][1] else 0
+            # If pm is mentioned and hour is less than 12, add 12 hours
+            if 'pm' in content.lower() and hour < 12:
+                hour += 12
+            event_time = f"{hour:02d}:{minute:02d}"
+
+        # Look for today/tomorrow/date patterns
+        today = datetime.now()
+        if 'tomorrow' in content.lower():
+            tomorrow = today + timedelta(days=1)
+            event_date = tomorrow.date().isoformat()  # Convert to YYYY-MM-DD string
+            print(f"Setting tomorrow's date: {event_date}")
+        elif 'today' in content.lower():
+            event_date = today.date().isoformat()  # Convert to YYYY-MM-DD string
+            print(f"Setting today's date: {event_date}")
+        
+        print(f"Extracted event_date: {event_date}, event_time: {event_time}")
+
         # Get tags from LLM response and convert to string
         tags = structured_note.get('tags', [])
         if isinstance(tags, list):
             tags = ','.join(tags)
-
-        note = await Note.create(
-            title=structured_note.get('title', 'AI Generated Note'),
-            content=structured_note.get('content', text),
-            tags=tags
-        )
-        
-        result = {
-            'note': note.to_dict(),
-            'original_text': text,
-            'language': language
-        }
-        print(f"Generated note: {result}")
-        return jsonify(result), 201
+            
+        try:
+            note = await Note.create(
+                title=structured_note.get('title', 'AI Generated Note'),
+                content=structured_note.get('content', text),
+                tags=tags,
+                event_date=event_date,
+                event_time=event_time
+            )
+            
+            result = {
+                'note': note.to_dict(),
+                'original_text': text,
+                'language': language,
+                'event_date': event_date,
+                'event_time': event_time
+            }
+            print(f"Generated note: {result}")
+            return jsonify(result), 201
+            
+        except Exception as e:
+            print(f"Error creating note: {str(e)}")
+            raise
         
     except Exception as e:
         print(f"Error generating AI note: {str(e)}")
