@@ -1110,8 +1110,11 @@ Examples:
                 const title = document.getElementById('noteTitle').value.trim();
                 const content = document.getElementById('noteContent').value.trim();
                 const tags = document.getElementById('noteTags').value.trim();
-                const event_date = document.getElementById('noteEventDate').value || null;
-                const event_time = document.getElementById('noteEventTime').value || null;
+                const event_date = document.getElementById('noteEventDate').value || null; // HTML date input returns YYYY-MM-DD
+                let event_time = document.getElementById('noteEventTime').value || null;   // HTML time input returns HH:MM
+                if (event_time && event_time.length === 5) {
+                    event_time = event_time + ':00'; // ensure HH:MM:SS
+                }
 
                 if (!title && !content) {
                     if (!isAutoSave) {
@@ -1146,7 +1149,14 @@ Examples:
                         });
                     }
 
-                    if (!response.ok) throw new Error('Failed to save note');
+                    if (!response.ok) {
+                        try {
+                            const err = await response.json();
+                            throw new Error(err.error || 'Failed to save note');
+                        } catch (_) {
+                            throw new Error('Failed to save note');
+                        }
+                    }
 
                     const savedNote = await response.json();
                     this.currentNote = savedNote;

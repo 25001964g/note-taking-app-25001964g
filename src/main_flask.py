@@ -50,11 +50,9 @@ async def create_note():
         data = request.json
         print(f"Received note data: {data}")
         
-        # Validate required fields
-        if not data.get('title'):
-            return jsonify({"error": "Title is required"}), 400
-        if not data.get('content'):
-            return jsonify({"error": "Content is required"}), 400
+        # Validate required fields: allow either title or content (match frontend UX)
+        if not (data.get('title') or data.get('content')):
+            return jsonify({"error": "Title or content is required"}), 400
         
         # Handle tags if present
         tags = data.get('tags', [])
@@ -62,10 +60,10 @@ async def create_note():
             tags = ','.join(str(tag).strip() for tag in tags if tag)
         
         try:
-            print(f"Creating note with title: {data['title']}")
+            print(f"Creating note with title: {data.get('title')} and content length: {len(data.get('content') or '')}")
             note = await Note.create(
-                title=data['title'],
-                content=data['content'],
+                title=(data.get('title') or 'Untitled'),
+                content=(data.get('content') or ''),
                 tags=tags if tags else None,
                 event_date=data.get('event_date'),
                 event_time=data.get('event_time')
@@ -117,12 +115,32 @@ async def update_note(note_id):
     if isinstance(tags, list):
         tags = ','.join(tags)
     
+    # Also pass through date/time so the model can normalize them
     updated_note = await note.update(
         title=data.get('title'),
         content=data.get('content'),
-        tags=tags
+        tags=tags,
+        event_date=data.get('event_date'),
+        event_time=data.get('event_time')
     )
     return jsonify(updated_note.to_dict())
+
+@app.route('/api/notes/normalize-preview', methods=['POST'])
+async def normalize_preview():
+    """Return normalized date/time strings without touching the database (debug helper)."""
+    try:
+        data = request.json or {}
+        d = data.get('event_date')
+        t = data.get('event_time')
+        normalized = {
+            'input_event_date': d,
+            'input_event_time': t,
+            'normalized_event_date': Note.format_date_str(d),
+            'normalized_event_time': Note.format_time_str(t)
+        }
+        return jsonify(normalized)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/notes/<note_id>', methods=['DELETE'])
 async def delete_note(note_id):
