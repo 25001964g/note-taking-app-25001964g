@@ -1210,9 +1210,13 @@ Examples:
 
                 const title = document.getElementById('noteTitle').value.trim();
                 const content = document.getElementById('noteContent').value.trim();
+                const tags = document.getElementById('noteTags').value.trim();
                 
-                if (!title && !content) {
-                    this.showMessage('Note title and content are both empty', 'error');
+                // Convert tags string to array
+                const tagsList = tags ? tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+                
+                if (!title && !content && !tagsList.length) {
+                    this.showMessage('Note has no content to translate', 'error');
                     return;
                 }
 
@@ -1225,7 +1229,8 @@ Examples:
                         body: JSON.stringify({ 
                             target_language: targetLanguage,
                             title: title,
-                            content: content
+                            content: content,
+                            tags: tagsList
                         })
                     });
 
@@ -1233,7 +1238,7 @@ Examples:
 
                     const result = await response.json();
                     
-                    if (result.translated_title !== undefined || result.translated_content !== undefined) {
+                    if (result.translated_title !== undefined || result.translated_content !== undefined || result.translated_tags !== undefined) {
                         // Replace the title and content directly in the form fields
                         if (result.translated_title && title) {
                             document.getElementById('noteTitle').value = result.translated_title;
@@ -1241,6 +1246,12 @@ Examples:
                         
                         if (result.translated_content && content) {
                             document.getElementById('noteContent').value = result.translated_content;
+                        }
+                        
+                        // Handle translated tags
+                        if (result.translated_tags && Array.isArray(result.translated_tags)) {
+                            const translatedTagsString = result.translated_tags.join(', ');
+                            document.getElementById('noteTags').value = translatedTagsString;
                         }
                         
                         // Update the editor title if title was translated

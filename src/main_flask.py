@@ -237,25 +237,52 @@ async def translate_note(note_id):
         target_language = data['target_language']
         print(f"Translating to {target_language}")
 
-        # Get current title and content
-        title = note.title or ''
-        content = note.content or ''
+        # Get current title, content and tags
+        title = data.get('title', note.title) or ''
+        content = data.get('content', note.content) or ''
+        tags = data.get('tags', note.tags) or ''
         print(f"Original title: {title}")
         print(f"Original content: {content}")
+        print(f"Original tags: {tags}")
 
-        # Translate both title and content
+        # Translate title, content and tags
         try:
             translated_title = translate(title, target_language) if title.strip() else ''
             print(f"Translated title: {translated_title}")
             
             translated_content = translate(content, target_language) if content.strip() else ''
             print(f"Translated content: {translated_content}")
+            
+            # Handle tags translation
+            translated_tags = []
+            if tags:
+                # Convert string tags to list if needed
+                tag_list = tags.split(',') if isinstance(tags, str) else tags
+                
+                # Translate each tag individually
+                for tag in tag_list:
+                    tag = tag.strip()
+                    if tag:
+                        try:
+                            translated_tag = translate(tag, target_language)
+                            # Clean up the translated tag (remove quotes if present)
+                            translated_tag = translated_tag.strip().strip('"\'')
+                            translated_tags.append(translated_tag)
+                            print(f"Translated tag '{tag}' to '{translated_tag}'")
+                        except Exception as e:
+                            print(f"Error translating tag '{tag}': {e}")
+                            # Keep original tag if translation fails
+                            translated_tags.append(tag)
+            
+            print(f"All translated tags: {translated_tags}")
 
             response = {
-                'translated_title': translated_title,
-                'translated_content': translated_content,
+                'translated_title': translated_title.strip() if translated_title else '',
+                'translated_content': translated_content.strip() if translated_content else '',
+                'translated_tags': translated_tags,  # Now it's an array
                 'original_title': title,
                 'original_content': content,
+                'original_tags': tag_list if isinstance(tags, list) else (tags.split(',') if tags else []),
                 'target_language': target_language
             }
             print(f"Sending response: {response}")
