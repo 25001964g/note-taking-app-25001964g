@@ -9,9 +9,10 @@ load_dotenv()
 supabase = None  # type: Optional[object]
 DB_READY = False
 
-def _read_env() -> tuple[str | None, str | None]:
+def _read_env():
     """Read env vars at call time to avoid stale values on cold start.
     Supports common aliases used in some deployments.
+    Returns: tuple of (url, key) or (None, None)
     """
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")

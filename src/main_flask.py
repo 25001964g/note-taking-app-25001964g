@@ -53,28 +53,23 @@ def health():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def _run_async(coro):
-    """Run an async coroutine in a safe event loop context for WSGI servers."""
+    """Run an async coroutine in a safe event loop context for WSGI/serverless."""
     try:
+        # Try to get existing loop
         loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("Event loop is closed")
         if loop.is_running():
-            new_loop = asyncio.new_event_loop()
-            try:
-                asyncio.set_event_loop(new_loop)
-                return new_loop.run_until_complete(coro)
-            finally:
-                new_loop.close()
-                asyncio.set_event_loop(loop)
+            # Loop is running (shouldn't happen in WSGI/serverless but handle it)
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, coro)
+                return future.result()
         else:
             return loop.run_until_complete(coro)
     except RuntimeError:
-        # No current event loop
-        loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(loop)
-            return loop.run_until_complete(coro)
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+        # No current event loop or it's closed - create new one
+        return asyncio.run(coro)
 
 
 @app.route('/api/notes', methods=['GET'])
@@ -101,6 +96,9 @@ def get_notes():
 def create_note():
     try:
         print("Received create note request")
+        print(f"Environment check - SUPABASE_URL exists: {bool(os.getenv('SUPABASE_URL'))}")
+        print(f"Environment check - SUPABASE_KEY exists: {bool(os.getenv('SUPABASE_KEY') or os.getenv('SUPABASE_ANON_KEY'))}")
+        
         if not request.is_json:
             return jsonify({"error": "Request must be JSON"}), 400
             
@@ -117,8 +115,13 @@ def create_note():
             tags = ','.join(str(tag).strip() for tag in tags if tag)
         
         try:
-            if not init_supabase_if_needed():
-                return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+            db_ready = init_supabase_if_needed()
+            print(f"DB initialization result: {db_ready}")
+            
+            if not db_ready:
+                error_msg = "Database not configured. Please set SUPABASE_URL and SUPABASE_KEY environment variables."
+                print(error_msg)
+                return jsonify({"error": error_msg}), 503
             print(f"Creating note with title: {data.get('title')} and content length: {len(data.get('content') or '')}")
             print(f"Incoming tags: {tags}")
             print(f"Incoming event_date: {data.get('event_date')} event_time: {data.get('event_time')}")
@@ -318,13 +321,13 @@ def generate_and_save_note():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/notes/<note_id>/translate', methods=['POST'])
-async def translate_note(note_id):
+def translate_note(note_id):
     """Translate a note to the target language"""
     try:
         print(f"Starting translation for note {note_id}")
         from src.llm import translate
         
-        note = await Note.get_by_id(note_id)
+        note = _run_async(Note.get_by_id(note_id))
         if note is None:
             print(f"Note {note_id} not found")
             return jsonify({"error": "Note not found"}), 404
@@ -415,5 +418,5 @@ def serve(path):
             return "index.html not found", 404
 
 if __name__ == '__main__':
-    port = int(os.getenv("PORT", 5002))
+    port = int(os.getenv("PORT", 5020))
     app.run(host='0.0.0.0', port=port, debug=True)
