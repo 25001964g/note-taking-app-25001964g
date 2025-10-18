@@ -497,7 +497,11 @@ async def translate_note(note_id):
 def serve(path):
     static_folder_path = app.static_folder
     if static_folder_path is None:
-        return "Static folder not configured", 404
+        # Fallback minimal page to avoid Vercel generic 404
+        return ("""
+        <!doctype html><html><head><meta charset='utf-8'><title>NoteTaker</title></head>
+        <body><h1>NoteTaker</h1><p>Static folder not configured.</p></body></html>
+        """), 200
 
     if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
         return send_from_directory(static_folder_path, path)
@@ -506,7 +510,22 @@ def serve(path):
         if os.path.exists(index_path):
             return send_from_directory(static_folder_path, 'index.html')
         else:
-            return "index.html not found", 404
+            # Return a lightweight inline HTML to avoid Vercel's 404 page and aid diagnostics
+            return ("""
+            <!doctype html><html><head><meta charset='utf-8'><title>NoteTaker</title>
+            <style>body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:40px;}</style>
+            </head><body>
+            <h1>NoteTaker</h1>
+            <p>index.html not found in static folder. API should still be accessible at <code>/api/notes</code>.</p>
+            </body></html>
+            """), 200
+
+@app.route('/favicon.ico')
+def favicon():
+    static_folder_path = app.static_folder
+    if static_folder_path and os.path.exists(os.path.join(static_folder_path, 'favicon.ico')):
+        return send_from_directory(static_folder_path, 'favicon.ico')
+    return ('', 204)
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5002))
