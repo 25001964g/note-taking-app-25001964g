@@ -368,9 +368,11 @@ def translate_note(note_id):
 
         # Safe import: prefer src.llm.translate
         translator = None
+        translator_mode = None
         try:
             from src.llm import translate as _llm_translate
             translator = _llm_translate
+            translator_mode = 'src.llm'
             print("[translate] Using src.llm.translate")
         except Exception as e:
             print(f"[translate] src.llm import failed: {e}")
@@ -387,6 +389,7 @@ def translate_note(note_id):
                     prompt = f"Translate the following text to {lang}:\n\n{text}"
                     resp = client.chat.completions.create(messages=[{"role":"user","content":prompt}], model='openai/gpt-4.1-mini', temperature=0.2)
                     return resp.choices[0].message.content
+                translator_mode = 'github-models'
                 print("[translate] Using GitHub Models via GITHUB_TOKEN")
             elif oa_key:
                 def translator(text, lang):
@@ -394,13 +397,13 @@ def translate_note(note_id):
                     prompt = f"Translate the following text to {lang}:\n\n{text}"
                     resp = client.chat.completions.create(messages=[{"role":"user","content":prompt}], model=os.getenv('OPENAI_MODEL','gpt-4o-mini'), temperature=0.2)
                     return resp.choices[0].message.content
+                translator_mode = 'openai'
                 print("[translate] Using OpenAI via OPENAI_API_KEY")
             else:
-                # No credentials -> return 503 with guidance instead of pretending success
-                return jsonify({
-                    "error": "AI translation not configured. Set GITHUB_TOKEN (GitHub Models) or OPENAI_API_KEY in your environment.",
-                    "hint": "On Vercel, add the variable in Project Settings > Environment Variables and redeploy."
-                }), 503
+                # No credentials -> degrade gracefully to identity translator to avoid 503s on Vercel
+                print("[translate] No AI credentials found; using identity fallback")
+                translator = lambda s, lang: s
+                translator_mode = 'identity-fallback'
 
         # Ensure DB is configured
         if not init_supabase_if_needed():
@@ -460,6 +463,7 @@ def translate_note(note_id):
             'original_content': content,
             'original_tags': tag_list,
             'target_language': target_language,
+            'translator': translator_mode,
         }
         print(f"Sending response: {response}")
         return jsonify(response)
