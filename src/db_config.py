@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # Load environment variables once at import time (safe for serverless)
 load_dotenv()
 
-_SUPABASE_URL = os.getenv("SUPABASE_URL", "https://nasmrxzpyvatumbrypxf.supabase.co")
+_SUPABASE_URL = os.getenv("SUPABASE_URL")
 _SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase = None  # type: Optional[object]
@@ -19,8 +19,11 @@ def init_supabase_if_needed() -> bool:
     global supabase, DB_READY
     if DB_READY and supabase is not None:
         return True
-    if not _SUPABASE_KEY:
-        print("SUPABASE_KEY is not set; database features are disabled")
+    if not _SUPABASE_URL or not _SUPABASE_KEY:
+        if not _SUPABASE_URL:
+            print("SUPABASE_URL is not set; database features are disabled")
+        if not _SUPABASE_KEY:
+            print("SUPABASE_KEY is not set; database features are disabled")
         DB_READY = False
         return False
     try:

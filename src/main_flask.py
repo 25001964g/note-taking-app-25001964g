@@ -119,6 +119,8 @@ def create_note():
             if not init_supabase_if_needed():
                 return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
             print(f"Creating note with title: {data.get('title')} and content length: {len(data.get('content') or '')}")
+            print(f"Incoming tags: {tags}")
+            print(f"Incoming event_date: {data.get('event_date')} event_time: {data.get('event_time')}")
             note = _run_async(Note.create(
                 title=(data.get('title') or 'Untitled'),
                 content=(data.get('content') or ''),
@@ -134,14 +136,22 @@ def create_note():
         except ValueError as ve:
             error_msg = str(ve)
             print(f"Validation error: {error_msg}")
-            return jsonify({"error": error_msg}), 400
+            debug = os.getenv('APP_DEBUG', '').lower() in ('1', 'true', 'yes')
+            body = {"error": "Validation error"}
+            if debug:
+                body["detail"] = error_msg
+            return jsonify(body), 400
             
         except Exception as e:
             error_msg = f"Database error: {str(e)}"
             print(error_msg)
             import traceback
             traceback.print_exc()
-            return jsonify({"error": "Failed to save note to database"}), 500
+            debug = os.getenv('APP_DEBUG', '').lower() in ('1', 'true', 'yes')
+            body = {"error": "Failed to save note to database"}
+            if debug:
+                body["detail"] = error_msg
+            return jsonify(body), 500
             
     except Exception as e:
         error_msg = f"Request processing error: {str(e)}"
@@ -178,14 +188,23 @@ def update_note(note_id):
         tags = ','.join(tags)
     
     # Also pass through date/time so the model can normalize them
-    updated_note = _run_async(note.update(
+    try:
+        print(f"Updating note {note_id} with payload: {data}")
+        updated_note = _run_async(note.update(
         title=data.get('title'),
         content=data.get('content'),
         tags=tags,
         event_date=data.get('event_date'),
         event_time=data.get('event_time')
-    ))
-    return jsonify(updated_note.to_dict())
+        ))
+        return jsonify(updated_note.to_dict())
+    except Exception as e:
+        print(f"Error updating note: {e}")
+        debug = os.getenv('APP_DEBUG', '').lower() in ('1', 'true', 'yes')
+        body = {"error": "Failed to update note"}
+        if debug:
+            body["detail"] = str(e)
+        return jsonify(body), 500
 
 @app.route('/api/notes/normalize-preview', methods=['POST'])
 def normalize_preview():
