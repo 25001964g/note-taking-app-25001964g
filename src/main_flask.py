@@ -418,5 +418,5 @@ def serve(path):
             return "index.html not found", 404
 
 if __name__ == '__main__':
-    port = int(os.getenv("PORT", 5020))
+    port = int(os.getenv("PORT", 5002))
     app.run(host='0.0.0.0', port=port, debug=True)
