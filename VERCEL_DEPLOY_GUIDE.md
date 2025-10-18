@@ -172,14 +172,16 @@ https://note-taking-app-25001964g.vercel.app
    - 新增註解說明
 
 4. **vercel.json**
-   - 移除 `pythonVersion` 配置（使用預設版本）
-   - 設定 `maxLambdaSize` 以避免套件過大問題
+   - 移除舊版的 `builds` 和 `routes` 配置
+   - 改用新版的 `rewrites` 配置
+   - Vercel 會自動檢測和部署 Python 函數
+   - 避免 "unused-build-settings" 警告
 
 ### Vercel Serverless 限制
 
 - **執行時間限制**：免費方案 10 秒，Pro 方案 60 秒
 - **記憶體限制**：1024 MB（免費方案）
-- **套件大小限制**：預設 50 MB（已設定 maxLambdaSize）
+- **套件大小限制**：預設 50 MB
 - **無法使用背景任務**：每個請求都是獨立的 function 執行
 
 ### 最佳實踐

@@ -127,9 +127,10 @@ Incoming event_date: 2025-10-18 event_time: 14:30
 ### 5. 優化 `vercel.json`
 
 **變更：**
-- 移除可能導致版本衝突的 `pythonVersion` 配置
-- 新增 `maxLambdaSize` 避免套件大小限制
-- 簡化路由配置
+- 移除舊版的 `builds` 和 `routes` 配置
+- 改用新版的 `rewrites` 配置
+- Vercel 現在會自動檢測 Python 函數
+- 簡化配置，避免 "unused-build-settings" 警告
 
 ### 6. 改善 `api/index.py`
 
