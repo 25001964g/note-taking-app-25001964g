@@ -16,6 +16,7 @@ from src.models.note_supabase import Note
 load_dotenv()
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
+print(f"[main_flask] Loaded. static_folder={app.static_folder}")
 
 # Enable CORS for all routes
 CORS(app)
@@ -505,30 +506,38 @@ async def translate_note(note_id):
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
-    static_folder_path = app.static_folder
-    if static_folder_path is None:
-        # Fallback minimal page to avoid Vercel generic 404
-        return ("""
-        <!doctype html><html><head><meta charset='utf-8'><title>NoteTaker</title></head>
-        <body><h1>NoteTaker</h1><p>Static folder not configured.</p></body></html>
-        """), 200
-
-    if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
-        return send_from_directory(static_folder_path, path)
-    else:
-        index_path = os.path.join(static_folder_path, 'index.html')
-        if os.path.exists(index_path):
-            return send_from_directory(static_folder_path, 'index.html')
-        else:
-            # Return a lightweight inline HTML to avoid Vercel's 404 page and aid diagnostics
+    try:
+        static_folder_path = app.static_folder
+        if static_folder_path is None:
             return ("""
-            <!doctype html><html><head><meta charset='utf-8'><title>NoteTaker</title>
-            <style>body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:40px;}</style>
-            </head><body>
-            <h1>NoteTaker</h1>
-            <p>index.html not found in static folder. API should still be accessible at <code>/api/notes</code>.</p>
-            </body></html>
+            <!doctype html><html><head><meta charset='utf-8'><title>NoteTaker</title></head>
+            <body><h1>NoteTaker</h1><p>Static folder not configured.</p></body></html>
             """), 200
+
+        target = os.path.join(static_folder_path, path) if path else None
+        if path and os.path.exists(target):
+            return send_from_directory(static_folder_path, path)
+        else:
+            index_path = os.path.join(static_folder_path, 'index.html')
+            if os.path.exists(index_path):
+                return send_from_directory(static_folder_path, 'index.html')
+            else:
+                return ("""
+                <!doctype html><html><head><meta charset='utf-8'><title>NoteTaker</title>
+                <style>body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:40px;}</style>
+                </head><body>
+                <h1>NoteTaker</h1>
+                <p>index.html not found in static folder. API should still be accessible at <code>/api/notes</code>.</p>
+                </body></html>
+                """), 200
+    except Exception as e:
+        import traceback
+        print(f"[serve] Error: {e}")
+        traceback.print_exc()
+        return (f"""
+        <!doctype html><html><head><meta charset='utf-8'><title>NoteTaker</title></head>
+        <body><h1>NoteTaker</h1><p>Server error while serving UI: {str(e)}</p></body></html>
+        """), 200
 
 @app.route('/favicon.ico')
 def favicon():
