@@ -366,13 +366,41 @@ def translate_note(note_id):
     try:
         print(f"Starting translation for note {note_id}")
 
-        # Safe import and fallback
+        # Safe import: prefer src.llm.translate
+        translator = None
         try:
             from src.llm import translate as _llm_translate
             translator = _llm_translate
+            print("[translate] Using src.llm.translate")
         except Exception as e:
-            print(f"[translate] LLM import failed, using identity translator: {e}")
-            translator = lambda s, lang: s
+            print(f"[translate] src.llm import failed: {e}")
+
+        # If unavailable, try to build a local translator using available credentials (GitHub Models or OpenAI)
+        if translator is None:
+            from openai import OpenAI
+            gh_token = os.getenv('GITHUB_TOKEN')
+            oa_key = os.getenv('OPENAI_API_KEY')
+
+            if gh_token:
+                def translator(text, lang):
+                    client = OpenAI(base_url='https://models.github.ai/inference', api_key=gh_token)
+                    prompt = f"Translate the following text to {lang}:\n\n{text}"
+                    resp = client.chat.completions.create(messages=[{"role":"user","content":prompt}], model='openai/gpt-4.1-mini', temperature=0.2)
+                    return resp.choices[0].message.content
+                print("[translate] Using GitHub Models via GITHUB_TOKEN")
+            elif oa_key:
+                def translator(text, lang):
+                    client = OpenAI(api_key=oa_key)
+                    prompt = f"Translate the following text to {lang}:\n\n{text}"
+                    resp = client.chat.completions.create(messages=[{"role":"user","content":prompt}], model=os.getenv('OPENAI_MODEL','gpt-4o-mini'), temperature=0.2)
+                    return resp.choices[0].message.content
+                print("[translate] Using OpenAI via OPENAI_API_KEY")
+            else:
+                # No credentials -> return 503 with guidance instead of pretending success
+                return jsonify({
+                    "error": "AI translation not configured. Set GITHUB_TOKEN (GitHub Models) or OPENAI_API_KEY in your environment.",
+                    "hint": "On Vercel, add the variable in Project Settings > Environment Variables and redeploy."
+                }), 503
 
         # Ensure DB is configured
         if not init_supabase_if_needed():
