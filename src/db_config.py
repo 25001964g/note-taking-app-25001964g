@@ -6,8 +6,17 @@ from dotenv import load_dotenv
 # Load environment variables once at import time (safe for serverless)
 load_dotenv()
 
-_SUPABASE_URL = os.getenv("SUPABASE_URL", "https://nasmrxzpyvatumbrypxf.supabase.co")
-_SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# Prefer server-side envs; fall back to common NEXT_PUBLIC names so Vercel config works out-of-the-box
+_SUPABASE_URL = (
+    os.getenv("SUPABASE_URL")
+    or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    or "https://nasmrxzpyvatumbrypxf.supabase.co"
+)
+_SUPABASE_KEY = (
+    os.getenv("SUPABASE_KEY")
+    or os.getenv("SUPABASE_ANON_KEY")
+    or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+)
 
 supabase = None  # type: Optional[object]
 DB_READY = False
@@ -20,7 +29,7 @@ def init_supabase_if_needed() -> bool:
     if DB_READY and supabase is not None:
         return True
     if not _SUPABASE_KEY:
-        print("SUPABASE_KEY is not set; database features are disabled")
+        print("SUPABASE_KEY/SUPABASE_ANON_KEY is not set; database features are disabled")
         DB_READY = False
         return False
     try:
