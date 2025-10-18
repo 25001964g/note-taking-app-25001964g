@@ -2,12 +2,20 @@
 import os
 from openai import OpenAI
 
-token = os.environ["GITHUB_TOKEN"]
-endpoint = "https://models.github.ai/inference"
+# Lazy load token and endpoint to avoid errors during module import
+def get_llm_client():
+    """Get OpenAI client with lazy loading of credentials"""
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        raise ValueError("GITHUB_TOKEN environment variable is not set")
+    endpoint = "https://models.github.ai/inference"
+    return OpenAI(base_url=endpoint, api_key=token)
+
 model = "openai/gpt-4.1-mini"
+
 # A function to call an LLM model and return the response
-def call_llm_model(model, messages, temperature=1.0, top_p=1.0):    
-    client = OpenAI(base_url=endpoint, api_key=token)
+def call_llm_model(model, messages, temperature=1.0, top_p=1.0):
+    client = get_llm_client()
     response = client.chat.completions.create(  
         messages=messages,
         temperature=temperature, top_p=top_p, model=model)
