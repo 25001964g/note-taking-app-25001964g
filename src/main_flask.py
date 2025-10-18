@@ -368,7 +368,21 @@ def generate_and_save_note():
     """Generate a structured note from user input using LLM and save it"""
     try:
         print("Starting AI note generation")
-        from src.llm import extract_notes
+        # Try importing LLM extractor; fall back if unavailable (do not modify llm.py)
+        def _fallback_extract(text: str, lang: str):
+            words = (text or '').strip().split()
+            title = ' '.join(words[:5]) if words else 'AI Generated Note'
+            return {
+                'title': title,
+                'content': text or '',
+                'tags': []
+            }
+        try:
+            from src.llm import extract_notes  # may fail if GITHUB_TOKEN missing at import time
+            _extract = lambda t, lang: extract_notes(t, lang=lang)
+        except Exception as e:
+            print(f"[generate-and-save] LLM import failed, using fallback: {e}")
+            _extract = _fallback_extract
         from datetime import datetime
         import re
         
@@ -381,8 +395,8 @@ def generate_and_save_note():
         
         print(f"Generating note for text: {text} in {language}")
         
-        # Extract structured notes using LLM
-        structured_note = extract_notes(text, lang=language)
+        # Extract structured notes using LLM (or fallback)
+        structured_note = _extract(text, language)
         print(f"LLM response: {structured_note}")
         
         # Infer event date/time using both the raw text and LLM content
@@ -395,6 +409,12 @@ def generate_and_save_note():
         if isinstance(tags, list):
             tags = ','.join(tags)
             
+        # Ensure database is available before persisting
+        if not init_supabase_if_needed():
+            return jsonify({
+                'error': 'Database not configured. Set SUPABASE_URL and SUPABASE_KEY.'
+            }), 503
+
         try:
             note = _run_async(Note.create(
                 title=structured_note.get('title', 'AI Generated Note'),
