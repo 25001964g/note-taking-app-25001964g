@@ -296,72 +296,149 @@ def get_note(note_id):
 
 @app.route('/api/notes/<note_id>', methods=['PUT'])
 def update_note(note_id):
-    if not init_supabase_if_needed():
-        return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
-    note = _run_async(Note.get_by_id(note_id))
-    if note is None:
-        return jsonify({"error": "Note not found"}), 404
-    
-    data = request.json
-    # Handle tags: convert list to comma-separated string if present
-    tags = data.get('tags', [])
-    if isinstance(tags, list):
-        tags = ','.join(tags)
-    
-    # Also pass through date/time so the model can normalize them
-    updated_note = _run_async(note.update(
-        title=data.get('title'),
-        content=data.get('content'),
-        tags=tags,
-        event_date=data.get('event_date'),
-        event_time=data.get('event_time')
-    ))
-    return jsonify(updated_note.to_dict())
-
-@app.route('/api/notes/normalize-preview', methods=['POST'])
-def normalize_preview():
-    """Return normalized date/time strings without touching the database (debug helper)."""
     try:
-        data = request.json or {}
-        d = data.get('event_date')
-        t = data.get('event_time')
-        normalized = {
-            'input_event_date': d,
-            'input_event_time': t,
-            'normalized_event_date': Note.format_date_str(d),
-            'normalized_event_time': Note.format_time_str(t)
-        }
-        return jsonify(normalized)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        if not init_supabase_if_needed():
+            return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+        note = _run_async(Note.get_by_id(note_id))
+        if note is None:
+            return jsonify({"error": "Note not found"}), 404
 
-@app.route('/api/notes/infer-datetime-preview', methods=['POST'])
-def infer_datetime_preview():
-    """Infer event_date and event_time from provided text/content without DB access."""
-    try:
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
         data = request.json or {}
-        text = data.get('text', '') or ''
-        content = data.get('content', '') or ''
-        event_date, event_time = infer_event_datetime(text, content)
-        return jsonify({
-            'input_text': text,
-            'input_content': content,
-            'inferred_event_date': event_date,
-            'inferred_event_time': event_time
-        })
+
+        # Normalize tags from list or string
+        tags_val = data.get('tags')
+        if isinstance(tags_val, list):
+            tags_norm = ','.join(str(t).strip() for t in tags_val if str(t).strip())
+        elif isinstance(tags_val, str):
+            tags_norm = tags_val.strip()
+        else:
+            tags_norm = tags_val  # None or other -> pass through
+
+        # Treat empty strings as None for date/time to avoid failing normalizers
+        event_date = data.get('event_date')
+        if isinstance(event_date, str) and event_date.strip() == '':
+            event_date = None
+        event_time = data.get('event_time')
+        if isinstance(event_time, str) and event_time.strip() == '':
+            event_time = None
+
+        updated_note = _run_async(note.update(
+            title=data.get('title'),
+            content=data.get('content'),
+            tags=tags_norm,
+            event_date=event_date,
+            event_time=event_time
+        ))
+        return jsonify(updated_note.to_dict())
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error updating note {note_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Failed to update note"}), 500
 
 @app.route('/api/notes/<note_id>', methods=['DELETE'])
 def delete_note(note_id):
-    if not init_supabase_if_needed():
-        return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
-    note = _run_async(Note.get_by_id(note_id))
-    if note is None:
-        return jsonify({"error": "Note not found"}), 404
-    
-    _run_async(note.delete())
-    return jsonify({"message": "Note deleted successfully"})
+    try:
+        if not init_supabase_if_needed():
+            return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+        note = _run_async(Note.get_by_id(note_id))
+        if note is None:
+            return jsonify({"error": "Note not found"}), 404
+        _run_async(note.delete())
+        return jsonify({"message": "Note deleted successfully"})
+    except Exception as e:
+        print(f"Error deleting note {note_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Failed to delete note"}), 500
+
+@app.route('/api/notes/<note_id>/translate', methods=['POST'])
+def translate_note(note_id):
+    """Translate a note to the target language without modifying llm.py.
+    - Synchronous route (Flask WSGI safe)
+    - Safe import of llm.translate; fallback to identity function if unavailable
+    - Robust tag handling (string/list/empty)
+    """
+    try:
+        print(f"Starting translation for note {note_id}")
+
+        # Safe import and fallback
+        try:
+            from src.llm import translate as _llm_translate
+            translator = _llm_translate
+        except Exception as e:
+            print(f"[translate] LLM import failed, using identity translator: {e}")
+            translator = lambda s, lang: s
+
+        # Ensure DB is configured
+        if not init_supabase_if_needed():
+            return jsonify({
+                "error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."
+            }), 503
+
+        # Fetch the note (async helper)
+        note = _run_async(Note.get_by_id(note_id))
+        if note is None:
+            print(f"Note {note_id} not found")
+            return jsonify({"error": "Note not found"}), 404
+
+        data = request.json or {}
+        print(f"Received translation request data: {data}")
+        target_language = data.get('target_language')
+        if not target_language:
+            print("Missing target_language in request")
+            return jsonify({"error": "target_language is required"}), 400
+
+        # Baseline text fields, allow overriding from request
+        title = (data.get('title') if data.get('title') is not None else note.title) or ''
+        content = (data.get('content') if data.get('content') is not None else note.content) or ''
+        tags = data.get('tags', note.tags)
+        if tags is None:
+            tags = ''
+        print(f"Original title: {title}")
+        print(f"Original content: {content}")
+        print(f"Original tags: {tags}")
+
+        # Translate title and content
+        translated_title = translator(title, target_language).strip() if title.strip() else ''
+        translated_content = translator(content, target_language).strip() if content.strip() else ''
+
+        # Normalize tags to list and translate each
+        if isinstance(tags, list):
+            tag_list = [str(t).strip() for t in tags if str(t).strip()]
+        elif isinstance(tags, str):
+            tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+        else:
+            tag_list = []
+
+        translated_tags = []
+        for tag in tag_list:
+            try:
+                tt = translator(tag, target_language)
+                translated_tags.append(tt.strip().strip("'\""))
+            except Exception as e:
+                print(f"Error translating tag '{tag}': {e}")
+                translated_tags.append(tag)
+
+        response = {
+            'translated_title': translated_title,
+            'translated_content': translated_content,
+            'translated_tags': translated_tags,
+            'original_title': title,
+            'original_content': content,
+            'original_tags': tag_list,
+            'target_language': target_language,
+        }
+        print(f"Sending response: {response}")
+        return jsonify(response)
+
+    except Exception as e:
+        print(f"Translation error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/notes/generate-and-save', methods=['POST'])
 def generate_and_save_note():
@@ -442,86 +519,7 @@ def generate_and_save_note():
         print(f"Error generating AI note: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/notes/<note_id>/translate', methods=['POST'])
-async def translate_note(note_id):
-    """Translate a note to the target language"""
-    try:
-        print(f"Starting translation for note {note_id}")
-        from src.llm import translate
-        
-        note = await Note.get_by_id(note_id)
-        if note is None:
-            print(f"Note {note_id} not found")
-            return jsonify({"error": "Note not found"}), 404
 
-        data = request.json
-        print(f"Received translation request data: {data}")
-        
-        if not data or 'target_language' not in data:
-            print("Missing target_language in request")
-            return jsonify({"error": "target_language is required"}), 400
-
-        target_language = data['target_language']
-        print(f"Translating to {target_language}")
-
-        # Get current title, content and tags
-        title = data.get('title', note.title) or ''
-        content = data.get('content', note.content) or ''
-        tags = data.get('tags', note.tags) or ''
-        print(f"Original title: {title}")
-        print(f"Original content: {content}")
-        print(f"Original tags: {tags}")
-
-        # Translate title, content and tags
-        try:
-            translated_title = translate(title, target_language) if title.strip() else ''
-            print(f"Translated title: {translated_title}")
-            
-            translated_content = translate(content, target_language) if content.strip() else ''
-            print(f"Translated content: {translated_content}")
-            
-            # Handle tags translation
-            translated_tags = []
-            if tags:
-                # Convert string tags to list if needed
-                tag_list = tags.split(',') if isinstance(tags, str) else tags
-                
-                # Translate each tag individually
-                for tag in tag_list:
-                    tag = tag.strip()
-                    if tag:
-                        try:
-                            translated_tag = translate(tag, target_language)
-                            # Clean up the translated tag (remove quotes if present)
-                            translated_tag = translated_tag.strip().strip('"\'')
-                            translated_tags.append(translated_tag)
-                            print(f"Translated tag '{tag}' to '{translated_tag}'")
-                        except Exception as e:
-                            print(f"Error translating tag '{tag}': {e}")
-                            # Keep original tag if translation fails
-                            translated_tags.append(tag)
-            
-            print(f"All translated tags: {translated_tags}")
-
-            response = {
-                'translated_title': translated_title.strip() if translated_title else '',
-                'translated_content': translated_content.strip() if translated_content else '',
-                'translated_tags': translated_tags,  # Now it's an array
-                'original_title': title,
-                'original_content': content,
-                'original_tags': tag_list if isinstance(tags, list) else (tags.split(',') if tags else []),
-                'target_language': target_language
-            }
-            print(f"Sending response: {response}")
-            return jsonify(response)
-            
-        except Exception as e:
-            print(f"Translation failed: {str(e)}")
-            raise
-
-    except Exception as e:
-        print(f"Translation error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
