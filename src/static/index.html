@@ -1249,6 +1249,7 @@ Examples:
                     const result = await response.json();
                     
                     if (result.translated_title !== undefined || result.translated_content !== undefined || result.translated_tags !== undefined) {
+                        const translatorMode = result.translator || 'unknown';
                         // Replace the title and content directly in the form fields
                         if (result.translated_title && title) {
                             document.getElementById('noteTitle').value = result.translated_title;
@@ -1268,8 +1269,15 @@ Examples:
                         if (result.translated_title && title) {
                             document.getElementById('editorTitle').textContent = result.translated_title;
                         }
-                        
-                        this.showMessage(`Successfully translated to ${targetLanguage}!`, 'success');
+                        // Show message depending on translator
+                        if (translatorMode === 'identity-fallback') {
+                            this.showMessage(
+                                `Translation service isn't configured on the server. Showing original text (set GITHUB_TOKEN or OPENAI_API_KEY).`,
+                                'error'
+                            );
+                        } else {
+                            this.showMessage(`Successfully translated to ${targetLanguage}! (${translatorMode})`, 'success');
+                        }
                     } else {
                         throw new Error(result.error || 'Translation failed');
                     }
