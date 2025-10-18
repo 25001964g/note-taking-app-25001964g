@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import asyncio
 from dotenv import load_dotenv
 
 # DON'T CHANGE THIS !!!
@@ -8,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
-from src.db_config import supabase
+from src.db_config import DB_READY, init_supabase_if_needed
 from src.models.note_supabase import Note
 
 # Load environment variables
@@ -31,17 +32,44 @@ def not_found_error(error):
 def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
-@app.route('/api/notes', methods=['GET'])
-async def get_notes():
+def _run_async(coro):
+    """Run an async coroutine in a safe event loop context for WSGI servers."""
     try:
-        notes = await Note.get_all()
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            new_loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(new_loop)
+                return new_loop.run_until_complete(coro)
+            finally:
+                new_loop.close()
+                asyncio.set_event_loop(loop)
+        else:
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        # No current event loop
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+
+@app.route('/api/notes', methods=['GET'])
+def get_notes():
+    try:
+        if not init_supabase_if_needed():
+            return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+        notes = _run_async(Note.get_all())
         return jsonify([note.to_dict() for note in notes])
     except Exception as e:
         print(f"Error in get_notes: {str(e)}")
         return jsonify({"error": "Failed to retrieve notes"}), 500
 
 @app.route('/api/notes', methods=['POST'])
-async def create_note():
+def create_note():
     try:
         print("Received create note request")
         if not request.is_json:
@@ -60,14 +88,16 @@ async def create_note():
             tags = ','.join(str(tag).strip() for tag in tags if tag)
         
         try:
+            if not init_supabase_if_needed():
+                return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
             print(f"Creating note with title: {data.get('title')} and content length: {len(data.get('content') or '')}")
-            note = await Note.create(
+            note = _run_async(Note.create(
                 title=(data.get('title') or 'Untitled'),
                 content=(data.get('content') or ''),
                 tags=tags if tags else None,
                 event_date=data.get('event_date'),
                 event_time=data.get('event_time')
-            )
+            ))
             
             result = note.to_dict()
             print(f"Successfully created note: {result}")
@@ -93,9 +123,11 @@ async def create_note():
         return jsonify({"error": "Failed to process note creation request"}), 500
 
 @app.route('/api/notes/<note_id>', methods=['GET'])
-async def get_note(note_id):
+def get_note(note_id):
     try:
-        note = await Note.get_by_id(note_id)
+        if not init_supabase_if_needed():
+            return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+        note = _run_async(Note.get_by_id(note_id))
         if note is None:
             return jsonify({"error": "Note not found"}), 404
         return jsonify(note.to_dict())
@@ -104,8 +136,10 @@ async def get_note(note_id):
         return jsonify({"error": "Failed to retrieve note"}), 500
 
 @app.route('/api/notes/<note_id>', methods=['PUT'])
-async def update_note(note_id):
-    note = await Note.get_by_id(note_id)
+def update_note(note_id):
+    if not init_supabase_if_needed():
+        return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+    note = _run_async(Note.get_by_id(note_id))
     if note is None:
         return jsonify({"error": "Note not found"}), 404
     
@@ -116,17 +150,17 @@ async def update_note(note_id):
         tags = ','.join(tags)
     
     # Also pass through date/time so the model can normalize them
-    updated_note = await note.update(
+    updated_note = _run_async(note.update(
         title=data.get('title'),
         content=data.get('content'),
         tags=tags,
         event_date=data.get('event_date'),
         event_time=data.get('event_time')
-    )
+    ))
     return jsonify(updated_note.to_dict())
 
 @app.route('/api/notes/normalize-preview', methods=['POST'])
-async def normalize_preview():
+def normalize_preview():
     """Return normalized date/time strings without touching the database (debug helper)."""
     try:
         data = request.json or {}
@@ -143,16 +177,18 @@ async def normalize_preview():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/notes/<note_id>', methods=['DELETE'])
-async def delete_note(note_id):
-    note = await Note.get_by_id(note_id)
+def delete_note(note_id):
+    if not init_supabase_if_needed():
+        return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+    note = _run_async(Note.get_by_id(note_id))
     if note is None:
         return jsonify({"error": "Note not found"}), 404
     
-    await note.delete()
+    _run_async(note.delete())
     return jsonify({"message": "Note deleted successfully"})
 
 @app.route('/api/notes/generate-and-save', methods=['POST'])
-async def generate_and_save_note():
+def generate_and_save_note():
     """Generate a structured note from user input using LLM and save it"""
     try:
         print("Starting AI note generation")
@@ -207,13 +243,13 @@ async def generate_and_save_note():
             tags = ','.join(tags)
             
         try:
-            note = await Note.create(
+            note = _run_async(Note.create(
                 title=structured_note.get('title', 'AI Generated Note'),
                 content=structured_note.get('content', text),
                 tags=tags,
                 event_date=event_date,
                 event_time=event_time
-            )
+            ))
             
             result = {
                 'note': note.to_dict(),

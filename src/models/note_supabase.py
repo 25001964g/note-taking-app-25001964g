@@ -2,7 +2,7 @@ from datetime import datetime, date, time
 import re
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
-from src.db_config import supabase
+from src.db_config import supabase, init_supabase_if_needed, DB_READY
 
 class Note(BaseModel):
     id: Optional[str] = None
@@ -64,62 +64,19 @@ class Note(BaseModel):
     @classmethod
     async def create(cls, title: str, content: str, tags: Optional[str] = None,
                     event_date: Optional[str] = None, event_time: Optional[str] = None) -> 'Note':
+        if not init_supabase_if_needed():
+            raise RuntimeError("Database is not configured. Set SUPABASE_URL and SUPABASE_KEY.")
         try:
             # Normalize event_date/time to canonical strings for Supabase (DATE/TIME)
-            def format_date_str(v) -> Optional[str]:
-                if v in (None, '', 'null'):
-                    return None
-                if isinstance(v, date) and not isinstance(v, datetime):
-                    return v.strftime('%Y-%m-%d')
-                if isinstance(v, datetime):
-                    return v.date().strftime('%Y-%m-%d')
-                s = str(v).strip()
-                if 'T' in s:
-                    s = s.split('T')[0]
-                for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d'):
-                    try:
-                        return datetime.strptime(s, fmt).date().strftime('%Y-%m-%d')
-                    except ValueError:
-                        pass
-                try:
-                    return datetime.fromisoformat(s).date().strftime('%Y-%m-%d')
-                except Exception:
-                    return None
-
-            def format_time_str(v) -> Optional[str]:
-                if v in (None, '', 'null'):
-                    return None
-                if isinstance(v, time):
-                    return v.replace(microsecond=0).strftime('%H:%M:%S')
-                if isinstance(v, datetime):
-                    return v.time().replace(microsecond=0).strftime('%H:%M:%S')
-                s = str(v).strip().lower()
-                m = re.match(r'^(\d{1,2}):?(\d{2})(?::?(\d{2}))?\s*([ap]\.?.?m\.?)?$', s)
-                if m:
-                    h = int(m.group(1)); mi = int(m.group(2)); sec = int(m.group(3) or 0)
-                    ampm = m.group(4)
-                    if ampm:
-                        if 'p' in ampm and h != 12:
-                            h += 12
-                        if 'a' in ampm and h == 12:
-                            h = 0
-                    h = max(0, min(23, h)); mi = max(0, min(59, mi)); sec = max(0, min(59, sec))
-                    return f"{h:02d}:{mi:02d}:{sec:02d}"
-                try:
-                    return time.fromisoformat(s).replace(microsecond=0).strftime('%H:%M:%S')
-                except Exception:
-                    return None
-
             event_date_str = Note.format_date_str(event_date)
             event_time_str = Note.format_time_str(event_time)
             if event_date and not event_date_str:
                 print(f"Invalid date format for event_date: {event_date}")
             if event_time and not event_time_str:
                 print(f"Invalid time format for event_time: {event_time}")
-            
+
             # Prepare data for insertion
             now = datetime.utcnow().replace(microsecond=0).isoformat()
-            
             data = {
                 'title': title,
                 'content': content,
@@ -131,47 +88,33 @@ class Note(BaseModel):
             }
             # Remove None values to avoid sending nulls for non-nullable columns
             payload = {k: v for k, v in data.items() if v is not None}
-            
+
             print(f"Attempting to insert note with payload: {payload}")
-            
-            try:
-                # Insert and force returning the inserted row
-                result = supabase.table('notes').insert(payload).execute()
-                print(f"Insert response: {result}")
-                
-                if not result.data:
-                    raise ValueError("No data returned from insert operation")
-                    
-                return_data = result.data[0]
-                print(f"Successfully inserted note: {return_data}")
-                
-                # Convert timestamps back to datetime objects
-                if 'created_at' in return_data and isinstance(return_data['created_at'], str):
-                    return_data['created_at'] = datetime.fromisoformat(return_data['created_at'].replace('Z', '+00:00'))
-                if 'updated_at' in return_data and isinstance(return_data['updated_at'], str):
-                    return_data['updated_at'] = datetime.fromisoformat(return_data['updated_at'].replace('Z', '+00:00'))
-                    
-                return cls(**return_data)
-            except Exception as e:
-                print(f"Failed to insert note: {str(e)}")
-                raise ValueError(f"Failed to insert note: {str(e)}")
-            
-            note_data = result.data[0] if result.data else None
-            if not note_data:
-                raise Exception("Failed to create note")
-            
-            # Convert datetime strings back to datetime objects
-            if 'created_at' in note_data:
-                note_data['created_at'] = datetime.fromisoformat(note_data['created_at'].replace('Z', '+00:00'))
-            if 'updated_at' in note_data:
-                note_data['updated_at'] = datetime.fromisoformat(note_data['updated_at'].replace('Z', '+00:00'))
-            return cls(**note_data)
+            # Insert and return inserted row
+            result = supabase.table('notes').insert(payload).execute()
+            print(f"Insert response: {result}")
+
+            if not result.data:
+                raise ValueError("No data returned from insert operation")
+
+            return_data = result.data[0]
+            print(f"Successfully inserted note: {return_data}")
+
+            # Convert timestamps back to datetime objects
+            if 'created_at' in return_data and isinstance(return_data['created_at'], str):
+                return_data['created_at'] = datetime.fromisoformat(return_data['created_at'].replace('Z', '+00:00'))
+            if 'updated_at' in return_data and isinstance(return_data['updated_at'], str):
+                return_data['updated_at'] = datetime.fromisoformat(return_data['updated_at'].replace('Z', '+00:00'))
+
+            return cls(**return_data)
         except Exception as e:
             print(f"Error creating note: {e}")
             raise
 
     @classmethod
     async def get_all(cls) -> list['Note']:
+        if not init_supabase_if_needed():
+            return []
         try:
             result = supabase.table('notes').select('*').execute()
             notes = []
@@ -189,6 +132,8 @@ class Note(BaseModel):
 
     @classmethod
     async def get_by_id(cls, note_id: str) -> Optional['Note']:
+        if not init_supabase_if_needed():
+            return None
         try:
             result = supabase.table('notes').select('*').eq('id', note_id).execute()
             if not result.data:
@@ -250,6 +195,8 @@ class Note(BaseModel):
             raise
 
     async def delete(self) -> None:
+        if not init_supabase_if_needed():
+            raise RuntimeError("Database is not configured")
         supabase.table('notes').delete().eq('id', self.id).execute()
 
     def to_dict(self) -> Dict[str, Any]:

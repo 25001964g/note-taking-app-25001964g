@@ -1,25 +1,39 @@
 import os
+from typing import Optional
 from supabase import create_client
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables once at import time (safe for serverless)
 load_dotenv()
 
-# Initialize Supabase client
-supabase_url = os.getenv("SUPABASE_URL", "https://nasmrxzpyvatumbrypxf.supabase.co")
-supabase_key = os.getenv("SUPABASE_KEY")
+_SUPABASE_URL = os.getenv("SUPABASE_URL", "https://nasmrxzpyvatumbrypxf.supabase.co")
+_SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-if not supabase_key:
-    raise ValueError("SUPABASE_KEY environment variable is not set")
+supabase = None  # type: Optional[object]
+DB_READY = False
 
-print(f"Initializing Supabase client with URL: {supabase_url}")
-supabase = create_client(supabase_url, supabase_key)
+def init_supabase_if_needed() -> bool:
+    """Lazy-init Supabase client. Returns True if ready, False otherwise.
+    Avoids raising at import time on serverless cold start.
+    """
+    global supabase, DB_READY
+    if DB_READY and supabase is not None:
+        return True
+    if not _SUPABASE_KEY:
+        print("SUPABASE_KEY is not set; database features are disabled")
+        DB_READY = False
+        return False
+    try:
+        print(f"Initializing Supabase client with URL: {_SUPABASE_URL}")
+        supabase = create_client(_SUPABASE_URL, _SUPABASE_KEY)
+        # Do not run test queries at import/cold start to reduce latency/failures
+        DB_READY = True
+        return True
+    except Exception as e:
+        print(f"Failed to initialize Supabase client: {e}")
+        supabase = None
+        DB_READY = False
+        return False
 
-# Test database connection
-try:
-    print("Testing database connection...")
-    test = supabase.table('notes').select("*").limit(1).execute()
-    print("Successfully connected to database")
-except Exception as e:
-    print(f"Failed to connect to database: {str(e)}")
-    raise
+# Try best-effort init (won't raise)
+init_supabase_if_needed()
