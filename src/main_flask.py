@@ -32,6 +32,25 @@ def not_found_error(error):
 def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
+# Simple health check to diagnose environment and DB readiness
+@app.route('/api/health', methods=['GET'])
+def health():
+    try:
+        has_url = bool(os.getenv('SUPABASE_URL'))
+        has_key = bool(os.getenv('SUPABASE_KEY'))
+        ready = init_supabase_if_needed()
+        status_code = 200 if ready else 503
+        return jsonify({
+            'status': 'ok' if ready else 'degraded',
+            'db_ready': ready,
+            'env': {
+                'has_supabase_url': has_url,
+                'has_supabase_key': has_key
+            }
+        }), status_code
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 def _run_async(coro):
     """Run an async coroutine in a safe event loop context for WSGI servers."""
     try:
@@ -60,10 +79,19 @@ def _run_async(coro):
 @app.route('/api/notes', methods=['GET'])
 def get_notes():
     try:
-        if not init_supabase_if_needed():
-            return jsonify({"error": "Database not configured. Set SUPABASE_URL and SUPABASE_KEY."}), 503
+        ready = init_supabase_if_needed()
         notes = _run_async(Note.get_all())
-        return jsonify([note.to_dict() for note in notes])
+        resp = jsonify([note.to_dict() for note in notes])
+        # If DB isn't ready, still return 200 with empty list to keep UI functional
+        # and add a warning header for observability.
+        if not ready:
+            try:
+                from flask import Response
+                if hasattr(resp, 'headers'):
+                    resp.headers['X-Warning'] = 'Database not configured; returning empty list.'
+            except Exception:
+                pass
+        return resp
     except Exception as e:
         print(f"Error in get_notes: {str(e)}")
         return jsonify({"error": "Failed to retrieve notes"}), 500
