@@ -10,7 +10,7 @@ load_dotenv()
 _SUPABASE_URL = (
     os.getenv("SUPABASE_URL")
     or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    or "https://nasmrxzpyvatumbrypxf.supabase.co"
+    or "https://jhtaoqrrnquxnicjrply.supabase.co"
 )
 _SUPABASE_KEY = (
     os.getenv("SUPABASE_KEY")
