@@ -57,6 +57,16 @@ def _run_async(coro):
             asyncio.set_event_loop(None)
 
 
+@app.route('/api/health', methods=['GET'])
+def health():
+    ready = init_supabase_if_needed()
+    return jsonify({
+        'ok': True,
+        'db_ready': ready,
+        'runtime': 'flask'
+    })
+
+
 # ------------------ Date/Time Inference Helpers (no external deps) ------------------
 from datetime import datetime, timedelta
 import re
