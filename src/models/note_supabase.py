@@ -1,11 +1,11 @@
 from datetime import datetime, date, time
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from pydantic import BaseModel
 from src.db_config import supabase, init_supabase_if_needed, DB_READY
 
 class Note(BaseModel):
-    id: Optional[str] = None
+    id: Optional[Union[int, str]] = None
     title: str
     content: str
     tags: Optional[str] = None
@@ -135,7 +135,14 @@ class Note(BaseModel):
         if not init_supabase_if_needed():
             return None
         try:
-            result = supabase.table('notes').select('*').eq('id', note_id).execute()
+            # Coerce numeric ids to int for exact match in Supabase
+            lookup_id = note_id
+            try:
+                if isinstance(note_id, str) and note_id.isdigit():
+                    lookup_id = int(note_id)
+            except Exception:
+                lookup_id = note_id
+            result = supabase.table('notes').select('*').eq('id', lookup_id).execute()
             if not result.data:
                 return None
             note_data = result.data[0]
@@ -234,7 +241,7 @@ class Note(BaseModel):
                 event_time_str = str(self.event_time)
         
         return {
-            'id': self.id,
+            'id': str(self.id) if self.id is not None else None,
             'title': self.title,
             'content': self.content,
             'tags': self.tags,
