@@ -20,8 +20,7 @@ app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'sta
 # Enable CORS for all routes
 CORS(app)
 
-# Configure JSON encoder for better datetime handling
-app.json_encoder = json.JSONEncoder
+# Note: Flask 3.x removed custom JSON encoder hooks; rely on default provider.
 
 # Add error handlers
 @app.errorhandler(404)
