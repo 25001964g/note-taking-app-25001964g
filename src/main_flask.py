@@ -37,7 +37,8 @@ def internal_error(error):
 def health():
     try:
         has_url = bool(os.getenv('SUPABASE_URL'))
-        has_key = bool(os.getenv('SUPABASE_KEY'))
+        # Accept any of the common key envs
+        has_key = bool(os.getenv('SUPABASE_KEY') or os.getenv('SUPABASE_ANON_KEY') or os.getenv('SUPABASE_SERVICE_ROLE_KEY'))
         ready = init_supabase_if_needed()
         status_code = 200 if ready else 503
         return jsonify({
