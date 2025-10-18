@@ -57,6 +57,154 @@ def _run_async(coro):
             asyncio.set_event_loop(None)
 
 
+# ------------------ Date/Time Inference Helpers (no external deps) ------------------
+from datetime import datetime, timedelta
+import re
+
+WEEKDAYS = {
+    'monday': 0, 'mon': 0,
+    'tuesday': 1, 'tue': 1, 'tues': 1,
+    'wednesday': 2, 'wed': 2,
+    'thursday': 3, 'thu': 3, 'thurs': 3,
+    'friday': 4, 'fri': 4,
+    'saturday': 5, 'sat': 5,
+    'sunday': 6, 'sun': 6,
+}
+
+MONTHS = {
+    'january': 1, 'jan': 1,
+    'february': 2, 'feb': 2,
+    'march': 3, 'mar': 3,
+    'april': 4, 'apr': 4,
+    'may': 5,
+    'june': 6, 'jun': 6,
+    'july': 7, 'jul': 7,
+    'august': 8, 'aug': 8,
+    'september': 9, 'sep': 9, 'sept': 9,
+    'october': 10, 'oct': 10,
+    'november': 11, 'nov': 11,
+    'december': 12, 'dec': 12,
+}
+
+def _next_weekday(target_weekday: int, ref: datetime) -> datetime:
+    days_ahead = (target_weekday - ref.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return ref + timedelta(days=days_ahead)
+
+def _this_or_next_weekday(target_weekday: int, ref: datetime, force_next: bool) -> datetime:
+    if force_next:
+        return _next_weekday(target_weekday, ref)
+    # upcoming occurrence including today
+    days_ahead = (target_weekday - ref.weekday()) % 7
+    return ref + timedelta(days=days_ahead)
+
+def infer_time(text: str) -> str or None:
+    s = (text or '').lower()
+    # Prefer explicit 24-hour times like 18:00 or 09:30 first
+    m0 = re.search(r'(?:\bat\s*)?\b([01]?\d|2[0-3]):([0-5]\d)\b', s)
+    if m0:
+        h = int(m0.group(1)); mi = int(m0.group(2))
+        return f"{h:02d}:{mi:02d}"
+    # hh:mm[:ss] with optional am/pm (fallback)
+    m = re.search(r'(?:at\s*)?(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)\b', s)
+    if m:
+        h = int(m.group(1)); mi = int(m.group(2) or 0)
+        ampm = m.group(4)
+        if ampm == 'pm' and h != 12:
+            h += 12
+        if ampm == 'am' and h == 12:
+            h = 0
+        h = max(0, min(23, h)); mi = max(0, min(59, mi))
+        return f"{h:02d}:{mi:02d}"
+    # 5pm / 1130am compact
+    m2 = re.search(r'\b(\d{1,2})(\d{2})?\s*(am|pm)\b', s)
+    if m2:
+        h = int(m2.group(1)); mi = int(m2.group(2) or 0)
+        ampm = m2.group(3)
+        if ampm == 'pm' and h != 12:
+            h += 12
+        if ampm == 'am' and h == 12:
+            h = 0
+        return f"{h:02d}:{mi:02d}"
+    # Named periods
+    if any(w in s for w in ['noon', 'midday']):
+        return '12:00'
+    if 'midnight' in s:
+        return '00:00'
+    if 'morning' in s:
+        return '09:00'
+    if 'afternoon' in s:
+        return '15:00'
+    if 'evening' in s:
+        return '19:00'
+    if 'night' in s:
+        return '21:00'
+    return None
+
+def _parse_numeric_date(token: str) -> datetime or None:
+    token = token.replace('.', '/').replace('-', '/').strip()
+    parts = token.split('/')
+    try:
+        if len(parts) == 3:
+            a, b, c = parts
+            if len(a) == 4:  # YYYY/MM/DD
+                return datetime(int(a), int(b), int(c))
+            d1, m1, y1 = int(a), int(b), int(c)
+            if 1 <= d1 <= 31 and 1 <= m1 <= 12 and len(c) == 4:
+                if d1 > 12:
+                    return datetime(y1, m1, d1)
+                if m1 > 12:
+                    return datetime(y1, d1, m1)
+                return datetime(y1, m1, d1)
+    except Exception:
+        return None
+    return None
+
+def infer_date(text: str, now: datetime = None) -> str or None:
+    if not text:
+        return None
+    now = now or datetime.now()
+    s = text.lower()
+    # Relative
+    if any(k in s for k in ['tomorrow', 'tmr', 'tmrw']):
+        return (now + timedelta(days=1)).date().isoformat()
+    if 'today' in s:
+        return now.date().isoformat()
+    # Weekdays
+    m = re.search(r'\b(next|this)?\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thurs|fri|sat|sun)\b', s)
+    if m:
+        modifier = (m.group(1) or '').strip()
+        wd = WEEKDAYS[m.group(2)]
+        dt = _this_or_next_weekday(wd, now, force_next=(modifier == 'next'))
+        return dt.date().isoformat()
+    # Month name forms
+    m2 = re.search(r'\b(\d{1,2})\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s*(\d{4})?\b', s)
+    if m2:
+        day = int(m2.group(1)); month = MONTHS[m2.group(2)]; year = int(m2.group(3) or now.year)
+        try:
+            return datetime(year, month, day).date().isoformat()
+        except Exception:
+            pass
+    m3 = re.search(r'\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+(\d{1,2})(?:,\s*(\d{4}))?\b', s)
+    if m3:
+        month = MONTHS[m3.group(1)]; day = int(m3.group(2)); year = int(m3.group(3) or now.year)
+        try:
+            return datetime(year, month, day).date().isoformat()
+        except Exception:
+            pass
+    # Numeric
+    for tok in re.findall(r'\b\d{1,4}[\-/\.]\d{1,2}[\-/\.]\d{1,4}\b', s):
+        dt = _parse_numeric_date(tok)
+        if dt:
+            return dt.date().isoformat()
+    return None
+
+def infer_event_datetime(*texts: str) -> tuple:
+    merged = ' \n '.join(t for t in texts if t)
+    return infer_date(merged), infer_time(merged)
+
+
 @app.route('/api/notes', methods=['GET'])
 def get_notes():
     try:
@@ -176,6 +324,23 @@ def normalize_preview():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/notes/infer-datetime-preview', methods=['POST'])
+def infer_datetime_preview():
+    """Infer event_date and event_time from provided text/content without DB access."""
+    try:
+        data = request.json or {}
+        text = data.get('text', '') or ''
+        content = data.get('content', '') or ''
+        event_date, event_time = infer_event_datetime(text, content)
+        return jsonify({
+            'input_text': text,
+            'input_content': content,
+            'inferred_event_date': event_date,
+            'inferred_event_time': event_time
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/notes/<note_id>', methods=['DELETE'])
 def delete_note(note_id):
     if not init_supabase_if_needed():
@@ -193,7 +358,7 @@ def generate_and_save_note():
     try:
         print("Starting AI note generation")
         from src.llm import extract_notes
-        from datetime import datetime, timedelta
+        from datetime import datetime
         import re
         
         data = request.json
@@ -209,33 +374,10 @@ def generate_and_save_note():
         structured_note = extract_notes(text, lang=language)
         print(f"LLM response: {structured_note}")
         
-        # Get content for parsing date/time
-        content = structured_note.get('content', text)
-        event_date = None
-        event_time = None
-        
-        # Look for time patterns like "Xpm", "X:YY pm", "X:YY"
-        time_pattern = r'(\d{1,2})(?::(\d{2}))?\s*(?:am|pm|AM|PM)?'
-        time_matches = re.findall(time_pattern, content.lower())
-        if time_matches:
-            hour = int(time_matches[0][0])
-            minute = int(time_matches[0][1]) if time_matches[0][1] else 0
-            # If pm is mentioned and hour is less than 12, add 12 hours
-            if 'pm' in content.lower() and hour < 12:
-                hour += 12
-            event_time = f"{hour:02d}:{minute:02d}"
-
-        # Look for today/tomorrow/date patterns
-        today = datetime.now()
-        if 'tomorrow' in content.lower():
-            tomorrow = today + timedelta(days=1)
-            event_date = tomorrow.date().isoformat()  # Convert to YYYY-MM-DD string
-            print(f"Setting tomorrow's date: {event_date}")
-        elif 'today' in content.lower():
-            event_date = today.date().isoformat()  # Convert to YYYY-MM-DD string
-            print(f"Setting today's date: {event_date}")
-        
-        print(f"Extracted event_date: {event_date}, event_time: {event_time}")
+        # Infer event date/time using both the raw text and LLM content
+        content = structured_note.get('content', '') or ''
+        event_date, event_time = infer_event_datetime(text, content)
+        print(f"Inferred event_date: {event_date}, event_time: {event_time}")
 
         # Get tags from LLM response and convert to string
         tags = structured_note.get('tags', [])
