@@ -48,7 +48,7 @@
 
         .main-content {
             display: grid;
-            grid-template-columns: 1fr 2fr;
+            grid-template-columns: 1fr; /* remove right editor column */
             gap: 30px;
             flex: 1;
         }
@@ -79,6 +79,7 @@
             position: sticky;
             top: 20px;
             overflow-y: auto;
+            display: none; /* hide inline editor container */
         }
 
         .note-editor::-webkit-scrollbar {
@@ -159,7 +160,7 @@
 
         /* AI Generate Modal Styles */
         .modal {
-            display: none;
+            display: none; /* will be set to flex when opened */
             position: fixed;
             z-index: 1000;
             left: 0;
@@ -168,17 +169,43 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(5px);
+            align-items: center; /* center vertically */
+            justify-content: center; /* center horizontally */
+            padding: 24px 16px; /* breathing room from edges */
+            overflow-y: auto; /* allow overlay to scroll if needed */
         }
 
         .modal-content {
             background: white;
-            margin: 10% auto;
+            margin: 0 auto; /* flex container centers it */
             padding: 30px;
             border-radius: 15px;
             width: 90%;
             max-width: 600px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             animation: modalSlideIn 0.3s ease;
+        }
+
+        /* Panelized modal that visually matches note-editor */
+        .modal-content.panel {
+            width: 95%;
+            max-width: 1100px;
+            padding: 0; /* inner panel will handle padding */
+            background: transparent;
+            box-shadow: none;
+            margin: 0 auto; /* remove extra top margin for panel layout */
+        }
+
+        .modal-editor {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 96px); /* keep entire panel visible inside overlay padding */
+            overflow-y: auto;
         }
 
         @keyframes modalSlideIn {
@@ -315,6 +342,12 @@
         .btn-cancel:hover {
             background: #e9ecef;
             border-color: #ced4da;
+        }
+
+        /* Modal in-panel message area */
+        .modal-message {
+            margin: 8px 0 18px;
+            text-align: center;
         }
 
         .loading-spinner {
@@ -504,6 +537,44 @@
 
         .translate-option:last-child {
             border-bottom: none;
+        }
+
+        /* Responsive: ensure header buttons are fully visible on small screens */
+        @media (max-width: 600px) {
+            .modal-content.panel {
+                max-width: 95vw;
+                margin: 0 auto;
+            }
+
+            .modal-editor {
+                padding: 20px;
+                max-height: calc(100vh - 72px);
+            }
+
+            .editor-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .editor-title {
+                font-size: 1.5rem;
+            }
+
+            .editor-actions {
+                width: 100%;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+                gap: 10px;
+            }
+
+            .editor-actions .btn {
+                width: 100%;
+                justify-content: center;
+                padding: 10px 12px;
+                font-size: 13px;
+                border-radius: 10px;
+            }
         }
 
         #editorForm {
@@ -855,6 +926,97 @@ Examples:
         </div>
     </div>
 
+    <!-- Create Note Modal -->
+    <div id="newNoteModal" class="modal">
+        <div class="modal-content panel">
+            <div class="modal-editor">
+                <div class="editor-header">
+                    <h2 class="editor-title">✨ Create New Note</h2>
+                    <div class="editor-actions">
+                        <button class="btn btn-save" id="createNoteConfirm">💾 Create</button>
+                        <button class="btn btn-delete" id="cancelNewNote">✖ Cancel</button>
+                    </div>
+                </div>
+            <div class="form-group">
+                <label class="form-label" for="newTitle">Title</label>
+                <input type="text" class="form-input" id="newTitle" placeholder="Enter title" />
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="newContent">Content</label>
+                <textarea id="newContent" class="form-input" placeholder="Write content..."></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="newTags">Tags</label>
+                <input type="text" class="form-input" id="newTags" placeholder="e.g. work, ideas" />
+            </div>
+            <div class="datetime-wrapper">
+                <div class="datetime-field">
+                    <label class="form-label" for="newEventDate">Event Date</label>
+                    <input type="date" class="form-input" id="newEventDate" />
+                </div>
+                <div class="datetime-field">
+                    <label class="form-label" for="newEventTime">Event Time</label>
+                    <input type="time" class="form-input" id="newEventTime" />
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Note Modal -->
+    <div id="editNoteModal" class="modal">
+        <div class="modal-content panel">
+            <div class="modal-editor">
+                <div class="editor-header">
+                    <h2 class="editor-title">✏️ Edit Note</h2>
+                    <div class="editor-actions">
+                        <button class="btn btn-save" id="saveEditNote">💾 Save</button>
+                        <div style="position: relative;">
+                            <button class="btn btn-translate" id="translateInEdit">🌐 Translate ▼</button>
+                            <div class="translate-dropdown" id="translateDropdownModal">
+                                <div class="translate-option" data-lang="Spanish"><span class="code">es</span> Spanish</div>
+                                <div class="translate-option" data-lang="French"><span class="code">fr</span> French</div>
+                                <div class="translate-option" data-lang="German"><span class="code">de</span> German</div>
+                                <div class="translate-option" data-lang="Italian"><span class="code">it</span> Italian</div>
+                                <div class="translate-option" data-lang="Portuguese"><span class="code">pt</span> Portuguese</div>
+                                <div class="translate-option" data-lang="Japanese"><span class="code">jp</span> Japanese</div>
+                                <div class="translate-option" data-lang="Korean"><span class="code">kr</span> Korean</div>
+                                <div class="translate-option" data-lang="Chinese"><span class="code">cn</span> Chinese</div>
+                                <div class="translate-option" data-lang="Russian"><span class="code">ru</span> Russian</div>
+                                <div class="translate-option" data-lang="Arabic"><span class="code">sa</span> Arabic</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-delete" id="deleteEditNote">🗑️ Delete</button>
+                        <button class="btn btn-delete" id="closeEditNoteModal">✖ Close</button>
+                    </div>
+                </div>
+                <div id="editModalMessage" class="modal-message"></div>
+            <div class="form-group">
+                <label class="form-label" for="editTitle">Title</label>
+                <input type="text" class="form-input" id="editTitle" />
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="editContent">Content</label>
+                <textarea id="editContent" class="form-input"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="editTags">Tags</label>
+                <input type="text" class="form-input" id="editTags" />
+            </div>
+            <div class="datetime-wrapper">
+                <div class="datetime-field">
+                    <label class="form-label" for="editEventDate">Event Date</label>
+                    <input type="date" class="form-input" id="editEventDate" />
+                </div>
+                <div class="datetime-field">
+                    <label class="form-label" for="editEventTime">Event Time</label>
+                    <input type="time" class="form-input" id="editEventTime" />
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         class NoteTaker {
             constructor() {
@@ -870,7 +1032,8 @@ Examples:
             }
 
             bindEvents() {
-                document.getElementById('newNoteBtn').addEventListener('click', () => this.createNewNote());
+                // Open Create Note modal instead of immediate inline editor
+                document.getElementById('newNoteBtn').addEventListener('click', () => this.openNewNoteModal());
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
@@ -880,6 +1043,11 @@ Examples:
                 document.getElementById('closeModal').addEventListener('click', () => this.closeAIGenerateModal());
                 document.getElementById('cancelGenerate').addEventListener('click', () => this.closeAIGenerateModal());
                 document.getElementById('generateNote').addEventListener('click', () => this.generateAINote());
+                
+                // Create Note modal controls
+                this.bindCreateModal();
+                // Edit Note modal controls
+                this.bindEditModal();
                 
                 // Close modal when clicking outside
                 document.getElementById('aiGenerateModal').addEventListener('click', (e) => {
@@ -921,6 +1089,246 @@ Examples:
                 
                 document.getElementById('noteTitle').addEventListener('input', autoSave);
                 document.getElementById('noteContent').addEventListener('input', autoSave);
+            }
+
+            bindCreateModal() {
+                // Create modal buttons may not exist yet on very early load
+                const closeBtn = document.getElementById('closeNewNoteModal');
+                const cancelBtn = document.getElementById('cancelNewNote');
+                const confirmBtn = document.getElementById('createNoteConfirm');
+                if (closeBtn) closeBtn.addEventListener('click', () => this.closeNewNoteModal());
+                if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeNewNoteModal());
+                if (confirmBtn) confirmBtn.addEventListener('click', () => this.createNoteFromModal());
+                // click outside to close
+                const modal = document.getElementById('newNoteModal');
+                if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) this.closeNewNoteModal(); });
+            }
+
+            bindEditModal() {
+                const closeBtn = document.getElementById('closeEditNoteModal');
+                const cancelBtn = document.getElementById('cancelEditNote');
+                const saveBtn = document.getElementById('saveEditNote');
+                if (closeBtn) closeBtn.addEventListener('click', () => this.closeEditNoteModal());
+                if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeEditNoteModal());
+                if (saveBtn) saveBtn.addEventListener('click', () => this.saveEditNoteFromModal());
+                const modal = document.getElementById('editNoteModal');
+                if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) this.closeEditNoteModal(); });
+                const translateBtn = document.getElementById('translateInEdit');
+                const dropdown = document.getElementById('translateDropdownModal');
+                if (translateBtn) translateBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    dropdown && dropdown.classList.toggle('show');
+                });
+                // close when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (dropdown) dropdown.classList.remove('show');
+                });
+                // option clicks
+                if (dropdown) dropdown.querySelectorAll('.translate-option').forEach(opt => {
+                    opt.addEventListener('click', async (e) => {
+                        const lang = e.currentTarget.getAttribute('data-lang');
+                        dropdown.classList.remove('show');
+                        if (!lang) return;
+                        // Show loading in modal
+                        const msgEl = document.getElementById('editModalMessage');
+                        const tBtn = document.getElementById('translateInEdit');
+                        if (tBtn) tBtn.disabled = true;
+                        if (msgEl) msgEl.innerHTML = '<div class="loading">Translating to ' + this.escapeHtml(lang) + '...</div>';
+
+                        // Sync modal -> inline editor before translate
+                        document.getElementById('noteTitle').value = document.getElementById('editTitle').value;
+                        document.getElementById('noteContent').value = document.getElementById('editContent').value;
+                        document.getElementById('noteTags').value = document.getElementById('editTags').value;
+                        document.getElementById('noteEventDate').value = document.getElementById('editEventDate').value;
+                        document.getElementById('noteEventTime').value = document.getElementById('editEventTime').value;
+                        let result;
+                        try {
+                            result = await this.translateNote(lang);
+                        } catch (_) {
+                            result = { success: false };
+                        }
+                        const success = !!(result && result.success === true);
+                        // Reflect translated values back to modal
+                        document.getElementById('editTitle').value = document.getElementById('noteTitle').value;
+                        document.getElementById('editContent').value = document.getElementById('noteContent').value;
+                        document.getElementById('editTags').value = document.getElementById('noteTags').value;
+
+                        if (msgEl) {
+                            if (success) {
+                                msgEl.innerHTML = '<div class="success">Translated to ' + this.escapeHtml(lang) + ' successfully.</div>';
+                                // auto-hide success in 3s
+                                if (this._modalMsgTimer) clearTimeout(this._modalMsgTimer);
+                                this._modalMsgTimer = setTimeout(() => {
+                                    const el = document.getElementById('editModalMessage');
+                                    if (el) el.innerHTML = '';
+                                }, 3000);
+                            } else {
+                                msgEl.innerHTML = '<div class="error">Failed to translate to ' + this.escapeHtml(lang) + '.</div>';
+                                if (this._modalMsgTimer) {
+                                    clearTimeout(this._modalMsgTimer);
+                                    this._modalMsgTimer = null;
+                                }
+                            }
+                        }
+                        if (tBtn) tBtn.disabled = false;
+                    });
+                });
+
+                // delete in edit modal
+                const delBtn = document.getElementById('deleteEditNote');
+                if (delBtn) delBtn.addEventListener('click', async () => {
+                    if (!this.currentNote || !this.currentNote.id) return;
+                    if (!confirm('Are you sure you want to delete this note?')) return;
+                    const msgEl = document.getElementById('editModalMessage');
+                    try {
+                        const res = await fetch(`/api/notes/${this.currentNote.id}`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error('Failed to delete note');
+                        // remove from list and refresh
+                        this.notes = this.notes.filter(n => n.id !== this.currentNote.id);
+                        await this.loadNotes();
+                        this.currentNote = null;
+                        this.closeEditNoteModal();
+                        if (msgEl) msgEl.innerHTML = '';
+                        this.showMessage('Note deleted successfully!', 'success');
+                    } catch (e) {
+                        if (msgEl) {
+                            msgEl.innerHTML = `<div class="error">Error deleting note: ${this.escapeHtml(e.message)}</div>`;
+                        } else {
+                            this.showMessage(`Error deleting note: ${e.message}`, 'error');
+                        }
+                    }
+                });
+            }
+
+            openNewNoteModal() {
+                const m = document.getElementById('newNoteModal');
+                if (!m) return;
+                document.getElementById('newTitle').value = '';
+                document.getElementById('newContent').value = '';
+                document.getElementById('newTags').value = '';
+                document.getElementById('newEventDate').value = '';
+                document.getElementById('newEventTime').value = '';
+                m.style.display = 'flex';
+            }
+            closeNewNoteModal() {
+                const m = document.getElementById('newNoteModal');
+                if (m) m.style.display = 'none';
+            }
+            async createNoteFromModal() {
+                const title = document.getElementById('newTitle').value.trim();
+                const content = document.getElementById('newContent').value.trim();
+                const tagsStr = document.getElementById('newTags').value.trim();
+                const event_date = document.getElementById('newEventDate').value || null;
+                let event_time = document.getElementById('newEventTime').value || null;
+                if (event_time && event_time.length === 5) event_time = event_time + ':00';
+                if (!title && !content) {
+                    this.showMessage('Please enter a title or content', 'error');
+                    return;
+                }
+                try {
+                    const payload = {
+                        title: title || 'Untitled',
+                        content,
+                        tags: tagsStr === '' ? [] : tagsStr.split(',').map(t=>t.trim()).filter(Boolean),
+                        event_date,
+                        event_time
+                    };
+                    const res = await fetch('/api/notes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!res.ok) throw new Error('Failed to create note');
+                    const note = await res.json();
+                    this.closeNewNoteModal();
+                    this.showMessage('Note created!', 'success');
+                    await this.loadNotes();
+                    if (note && note.id) this.selectNote(note.id);
+                } catch (e) {
+                    this.showMessage(`Error creating note: ${e.message}`, 'error');
+                }
+            }
+
+            openEditNoteModal() {
+                if (!this.currentNote) {
+                    this.showMessage('Select a note first', 'error');
+                    return;
+                }
+                const m = document.getElementById('editNoteModal');
+                if (!m) return;
+                document.getElementById('editTitle').value = document.getElementById('noteTitle').value;
+                document.getElementById('editContent').value = document.getElementById('noteContent').value;
+                document.getElementById('editTags').value = document.getElementById('noteTags').value;
+                document.getElementById('editEventDate').value = document.getElementById('noteEventDate').value;
+                document.getElementById('editEventTime').value = document.getElementById('noteEventTime').value;
+                m.style.display = 'flex';
+            }
+            closeEditNoteModal() {
+                const m = document.getElementById('editNoteModal');
+                if (m) m.style.display = 'none';
+            }
+            async saveEditNoteFromModal() {
+                if (!this.currentNote || !this.currentNote.id) return;
+                const title = document.getElementById('editTitle').value.trim();
+                const content = document.getElementById('editContent').value.trim();
+                const tagsStr = document.getElementById('editTags').value.trim();
+                const event_date = document.getElementById('editEventDate').value || null;
+                let event_time = document.getElementById('editEventTime').value || null;
+                if (event_time && event_time.length === 5) event_time = event_time + ':00';
+                if (!title && !content) {
+                    this.showMessage('Please enter a title or content', 'error');
+                    return;
+                }
+                try {
+                    const msgEl = document.getElementById('editModalMessage');
+                    const sBtn = document.getElementById('saveEditNote');
+                    if (sBtn) sBtn.disabled = true;
+                    if (msgEl) msgEl.innerHTML = '';
+                    const payload = {
+                        title: title || 'Untitled',
+                        content,
+                        tags: tagsStr === '' ? [] : tagsStr.split(',').map(t=>t.trim()).filter(Boolean),
+                        event_date,
+                        event_time
+                    };
+                    const res = await fetch(`/api/notes/${this.currentNote.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!res.ok) throw new Error('Failed to save note');
+                    const note = await res.json();
+                    // Sync inline editor values
+                    document.getElementById('noteTitle').value = note.title || '';
+                    document.getElementById('noteContent').value = note.content || '';
+                    document.getElementById('noteTags').value = Array.isArray(note.tags) ? note.tags.join(', ') : (note.tags || '');
+                    document.getElementById('noteEventDate').value = note.event_date || '';
+                    document.getElementById('noteEventTime').value = note.event_time || '';
+                    document.getElementById('editorTitle').textContent = note.title || 'Untitled Note';
+                    // Show success in modal and auto-hide after 3s
+                    if (msgEl) {
+                        msgEl.innerHTML = '<div class="success">Note saved successfully!</div>';
+                        if (this._modalMsgTimer) clearTimeout(this._modalMsgTimer);
+                        this._modalMsgTimer = setTimeout(() => {
+                            const el = document.getElementById('editModalMessage');
+                            if (el) el.innerHTML = '';
+                        }, 3000);
+                    } else {
+                        this.showMessage('Note saved successfully!', 'success');
+                    }
+                    await this.loadNotes();
+                    // Keep modal open; no reselection needed
+                    if (sBtn) sBtn.disabled = false;
+                } catch (e) {
+                    const msgEl = document.getElementById('editModalMessage');
+                    if (msgEl) {
+                        msgEl.innerHTML = `<div class="error">Error saving note: ${this.escapeHtml(e.message)}</div>`;
+                    } else {
+                        this.showMessage(`Error saving note: ${e.message}`, 'error');
+                    }
+                    const sBtn = document.getElementById('saveEditNote');
+                    if (sBtn) sBtn.disabled = false;
+                }
             }
 
             async loadNotes() {
@@ -986,6 +1394,9 @@ Examples:
                     document.getElementById('noteEventDate').value = this.currentNote.event_date || '';
                     document.getElementById('noteEventTime').value = this.currentNote.event_time || '';
                     document.getElementById('editorTitle').textContent = this.currentNote.title || 'Untitled Note';
+
+                    // Open edit modal after selecting a note
+                    this.openEditNoteModal();
                 } catch (error) {
                     console.error('Error selecting note:', error);
                     this.showMessage('Failed to load note. Please try again.', 'error');
@@ -1015,7 +1426,7 @@ Examples:
 
             // AI Generate Note Methods
             openAIGenerateModal() {
-                document.getElementById('aiGenerateModal').style.display = 'block';
+                document.getElementById('aiGenerateModal').style.display = 'flex';
                 document.getElementById('userPrompt').focus();
                 // Reset form
                 document.getElementById('userPrompt').value = '';
@@ -1215,7 +1626,7 @@ Examples:
             async translateNote(targetLanguage) {
                 if (!this.currentNote || !this.currentNote.id) {
                     this.showMessage('Please select a note first', 'error');
-                    return;
+                    return { success: false };
                 }
 
                 const title = document.getElementById('noteTitle').value.trim();
@@ -1275,14 +1686,17 @@ Examples:
                                 `Translation service isn't configured on the server. Showing original text (set GITHUB_TOKEN or OPENAI_API_KEY).`,
                                 'error'
                             );
+                            return { success: false, translator: translatorMode };
                         } else {
                             this.showMessage(`Successfully translated to ${targetLanguage}! (${translatorMode})`, 'success');
+                            return { success: true, translator: translatorMode };
                         }
                     } else {
                         throw new Error(result.error || 'Translation failed');
                     }
                 } catch (error) {
                     this.showMessage(`Error translating note: ${error.message}`, 'error');
+                    return { success: false };
                 }
             }
 
