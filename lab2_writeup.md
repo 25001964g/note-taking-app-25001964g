@@ -1,4 +1,4 @@
-# Lab 2 – Note‑Taking App UI/UX Enhancements
+# Lab 2 – Note‑Taking App
 
 This document records what we built, how we built it, the key challenges, and where to look in the code. Screenshots are linked so the write‑up stands on its own.
 
